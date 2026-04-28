@@ -6,7 +6,7 @@ import { dashboardApi } from "../api/queries";
 import { Badge, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { errorMessage, formatDateTime, formatNumber } from "../lib/utils";
 
-const palette = ["#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#4b5563"];
+const palette = ["#5E6AD2", "#4DAA81", "#E8C547", "#E06C75", "#9B86E8", "#38BDF8", "#6B7280"];
 
 export function Dashboard() {
   const stats = useQuery({ queryKey: ["dashboard", "stats"], queryFn: dashboardApi.stats });
@@ -17,10 +17,10 @@ export function Dashboard() {
   if (trend.isError) return <ErrorState message={errorMessage(trend.error)} />;
 
   const cards = [
-    { label: "资源总数", value: stats.data.total, icon: BarChart3, tone: "text-blue-600" },
-    { label: "已离线", value: stats.data.downloaded, icon: CheckCircle2, tone: "text-emerald-600" },
-    { label: "待处理", value: stats.data.pending, icon: Clock3, tone: "text-amber-600" },
-    { label: "重试队列", value: stats.data.retry_pending, icon: RotateCcw, tone: "text-rose-600" },
+    { label: "资源总数", value: stats.data.total, icon: BarChart3, tone: "text-primary" },
+    { label: "已离线", value: stats.data.downloaded, icon: CheckCircle2, tone: "text-emerald-400" },
+    { label: "待处理", value: stats.data.pending, icon: Clock3, tone: "text-amber-400" },
+    { label: "重试队列", value: stats.data.retry_pending, icon: RotateCcw, tone: "text-rose-400" },
   ];
 
   return (
@@ -45,11 +45,11 @@ export function Dashboard() {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trend.data.items}>
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
                 <Tooltip />
-                <Line type="monotone" dataKey="total" name="总数" stroke="#2563eb" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="downloaded" name="已离线" stroke="#059669" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="total" name="总数" stroke="#5E6AD2" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="downloaded" name="已离线" stroke="#4DAA81" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

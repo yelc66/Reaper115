@@ -16,9 +16,13 @@ export default {
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         surface: "hsl(var(--surface))",
+        "surface-elevated": "hsl(var(--surface-elevated))",
       },
       boxShadow: {
-        panel: "0 1px 2px rgba(15, 23, 42, 0.08)",
+        panel: "0 0 0 1px rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.4)",
+      },
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
       },
     },
   },
