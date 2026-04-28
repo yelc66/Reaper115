@@ -1,41 +1,42 @@
-version: '3.8'
 services:
   115-bot:
     container_name: tg-bot-115
     environment:
-      TZ: Asia/Shanghai
+      TZ: ${TZ:-Asia/Shanghai}
       # 已有 FlareSolverr 服务的话取消注释并填写地址
-      # FLARESOLVERR_URL: http://your_server:8191
+      FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://flaresolverr:8191/v1}
       
       # 浏览器初始化失败时尝试打开此选项，与下面的 chrome 服务配合使用
-      # REMOTE_SELENIUM_URL: http://chrome:4444/wd/hub
+      REMOTE_SELENIUM_URL: ${REMOTE_SELENIUM_URL:-}
       
       # 填写代理如果需要的话(两个都要填)
       # 带账号密码格式：http://user:pass@1.2.3.4:7890
       # 不带账号密码格式：http://1.2.3.4:7890
-      # HTTP_PROXY: http://your_http_proxy:proxy_port
-      # HTTPS_PROXY: http://your_https_proxy:proxy_port
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
       
       # 根据实际需要添加其他不需代理的地址
-      # NO_PROXY: localhost,127.0.0.1,::1,chrome,flaresolverr
-    image: qiqiandfei/115-bot:latest
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,chrome,flaresolverr}
+    image: ${BOT_IMAGE:-qiqiandfei/115-bot:latest}
     # 共享内存大小，防止浏览器崩溃，有条件可以多给点
     shm_size: "2gb"
     # 浏览器初始化失败时尝试打开此选项
     privileged: True
     restart: unless-stopped
+    ports:
+      - ${WEB_PORT:-8000}:8000
     volumes:
-      - /to/your/path/config:/config  # 配置目录
-      - /to/your/path/tmp:/tmp        # 临时目录
-      - /to/your/path/media:/media    # 媒体目录（软链目录）
-      - /to/your/path/CloudNAS:/CloudNAS:rslave # CD2挂载目录
+      - ${CONFIG_DIR:-./config}:/config  # 配置目录
+      - ${TMP_DIR:-./tmp}:/tmp        # 临时目录
+      - ${MEDIA_DIR:-./media}:/media    # 媒体目录（软链目录）
+      - ${CLOUDNAS_DIR:-./CloudNAS}:/CloudNAS:rslave # CD2挂载目录
 
   # 需要额外部署 FlareSolverr 服务时取消注释此部分
   flaresolverr:
     container_name: flaresolverr
     environment:
       - LOG_LEVEL=info
-      - TZ=Asia/Shanghai
+      - TZ=${TZ:-Asia/Shanghai}
     image: ghcr.io/flaresolverr/flaresolverr:latest
     restart: unless-stopped
 

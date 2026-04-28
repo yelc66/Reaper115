@@ -1,18 +1,7 @@
 #!/bin/bash
 
-# 构建基础镜像
-echo "Building base image..."
-docker build -f Dockerfile.base -t 115bot:base .
-
-# 检查基础镜像构建结果
-if [ $? -ne 0 ]; then
-    echo "Base image build failed!"
-    exit 1
-fi
-
-# 构建应用镜像
 echo "Building application image..."
-docker build -f Dockerfile -t 115bot:latest .
+docker build -f Dockerfile -t 115bot:latest -t qiqiandfei/115-bot:latest .
 
 # 检查应用镜像构建结果
 if [ $? -ne 0 ]; then

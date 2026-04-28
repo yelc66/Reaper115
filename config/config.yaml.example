@@ -5,6 +5,14 @@
 # 日志级别
 # debug|info|warning|error|critical
 log_level: info
+############################################Web管理界面##################################
+web:
+  # 是否启动 FastAPI Web API
+  enable: true
+  # 容器内监听地址，Docker 部署保持 0.0.0.0
+  host: 0.0.0.0
+  # 容器内监听端口；docker-compose 默认映射到宿主机 WEB_PORT 或 8000
+  port: 8000
 ############################################Telegram设置##################################
 # bot token （必填）
 # 机器人唯一Token，如果没有@BotFather创建

@@ -810,6 +810,7 @@ class OpenAPI_115:
     
         
     @handle_token_expiry
+    @handle_token_expiry
     def get_user_info(self):
         """获取用户信息"""
         url = f"{self.base_url}/open/user/info"
@@ -962,11 +963,12 @@ class OpenAPI_115:
         """欢迎消息"""
         user_info = self.get_user_info()
         quota_info = self.get_quota_info()
-        if user_info:
-            user_name = user_info.get('user_name')
-            total_space= user_info['rt_space_info']['all_total']['size_format']
-            used_space = user_info['rt_space_info']['all_use']['size_format']
-            remaining_space = user_info['rt_space_info']['all_remain']['size_format']
+        space_info = user_info.get('rt_space_info') if isinstance(user_info, dict) else None
+        if space_info:
+            user_name = user_info.get('user_name', '')
+            total_space = space_info['all_total']['size_format']
+            used_space = space_info['all_use']['size_format']
+            remaining_space = space_info['all_remain']['size_format']
             vip_info = user_info.get('vip_info', {})
             # 判断永V
             if "长期" in vip_info.get('level_name', ''):
@@ -975,10 +977,12 @@ class OpenAPI_115:
             line1 = escape_markdown(f"👋 [{user_name}]您好， 欢迎使用Telegram-115Bot！", version=2)
             line2 = escape_markdown(f"会员等级：{vip_info.get('level_name', '')} \n到期时间：{expire_date}", version=2)
             line3 = escape_markdown(f"总空间：{total_space} \n已用：{used_space} \n剩余：{remaining_space}", version=2)
-            line4 = escape_markdown(f"离线配额：{quota_info['used']}/{quota_info['count']}", version=2)   
+            quota_used = quota_info.get('used', '?') if isinstance(quota_info, dict) else '?'
+            quota_count = quota_info.get('count', '?') if isinstance(quota_info, dict) else '?'
+            line4 = escape_markdown(f"离线配额：{quota_used}/{quota_count}", version=2)
             return line1, line2, line3, line4
         else:
-            line1 = escape_markdown(f"👋 [{user_name}]您好， 欢迎使用Telegram-115Bot！", version=2)
+            line1 = escape_markdown("👋 欢迎使用Telegram-115Bot！（Token 已过期，请重新授权）", version=2)
             return line1, "", "", ""
 
 

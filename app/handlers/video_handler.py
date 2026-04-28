@@ -9,7 +9,11 @@ import uuid
 from datetime import datetime
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
-from app.core.video_downloader import video_manager
+class _VideoManagerStub:
+    async def add_task(self, task_info): pass
+    async def cancel_task(self, task_id): return False
+
+video_manager = _VideoManagerStub()
 
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 # 过滤 Telethon 的异步会话实验性功能警告
@@ -22,25 +26,8 @@ async def save_video2115(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ 对不起，您无权使用115机器人！")
         return
     
-    if not init.tg_user_client:
-        message = "⚠️ Telegram 用户客户端初始化失败，配置方法请参考\nhttps://github.com/qiqiandfei/Telegram-115bot/wiki/VideoDownload"
-        await update.message.reply_text(message)
-        return
-
-    # 检查和建立 Telegram 用户客户端连接
-    try:
-        if not init.tg_user_client.is_connected():
-            init.logger.info("🔄 正在验证 Telegram 用户客户端连接...")
-            await init.tg_user_client.connect()
-        
-        if not await init.tg_user_client.is_user_authorized():
-            await update.message.reply_text("❌ Telegram 用户客户端未授权！")
-            return
-            
-    except Exception as e:
-        init.logger.error(f"Telegram 用户客户端连接失败: {e}")
-        await update.message.reply_text(f"❌ 连接失败: {str(e)}")
-        return
+    await update.message.reply_text("⚠️ 视频转存功能已禁用（当前版本不支持 Telethon 客户端）")
+    return
 
     if update.message and update.message.video:
         video = update.message.video
@@ -231,44 +218,8 @@ async def handle_category_selection(update: Update, context: ContextTypes.DEFAUL
                 await query.edit_message_text("❌ 无法确定消息来源 (Entity unknown)")
                 return
 
-            # 尝试获取消息
-            target_msg = None
-            
-            # 方法1: 精确 ID 获取 (Telethon get_messages with ids)
-            try:
-                msg = await init.tg_user_client.get_messages(entity, ids=video_info['message_id'])
-                if msg and msg.media:
-                    target_msg = msg
-            except Exception as e:
-                init.logger.warning(f"精确获取消息失败: {e}")
-
-            # 方法2: 遍历最近消息 (Fallback，兼容旧逻辑)
-            if not target_msg:
-                init.logger.info(f"精确获取失败，尝试遍历最近消息 (ID: {video_info['message_id']})")
-                try:
-                    # 获取最近 20 条消息
-                    recent_msgs = await init.tg_user_client.get_messages(entity, limit=20)
-                    
-                    # 2.1 优先寻找 ID 匹配的消息
-                    for msg in recent_msgs:
-                        if msg.id == video_info['message_id'] and msg.media:
-                            target_msg = msg
-                            break
-                    
-                    # 2.2 如果没找到 ID，寻找最近的一条带视频的消息 (用户提到的"原来的写法")
-                    if not target_msg:
-                        for msg in recent_msgs:
-                            if msg.media:
-                                # 简单的校验：如果是视频/文件
-                                target_msg = msg
-                                init.logger.info(f"使用最近的媒体消息作为目标 (ID: {msg.id})")
-                                break
-                except Exception as e:
-                    init.logger.error(f"遍历消息失败: {e}")
-
-            if not target_msg:
-                await query.edit_message_text(f"❌ 无法获取原始视频消息 (Entity: {entity}, ID: {video_info['message_id']})")
-                return
+            await query.edit_message_text("⚠️ 视频转存功能已禁用")
+            return
                 
             # 提交任务到管理器
             task_info = {

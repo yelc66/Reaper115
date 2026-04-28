@@ -1,3 +1,12 @@
+# Stage 1: Build the React frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /build
+COPY web-ui/package.json web-ui/package-lock.json ./
+RUN npm ci --prefer-offline
+COPY web-ui/ ./
+RUN npm run build
+
+# Stage 2: Python runtime
 FROM python:3.12-slim
 LABEL authors="qiqiandfei"
 
@@ -41,6 +50,9 @@ RUN pip install --upgrade pip --no-cache-dir && \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then seleniumbase install chromedriver; fi
 
 ADD ./app .
+
+# 3b. 将前端构建产物复制到 web/dist/，FastAPI 会作为静态文件提供服务
+COPY --from=frontend-builder /build/dist /app/web/dist
 
 # 4. 设置路径
 ENV PYTHONPATH="/app:/app/utils:/app/core:/app/handlers:/app/.."

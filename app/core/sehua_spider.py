@@ -547,14 +547,14 @@ async def age_check():
         content = await browser.get_page_source()
         init.logger.debug(f"  页面内容长度: {len(content)}")
         # 检测多种可能的年龄验证提示文本
-        age_indicators = ["满18岁，请点此进入", "满18岁,请点此进入", "点此进入", "进入论坛", "进入"]
+        age_indicators = ["满18岁，请点此进入", "满18岁,请点此进入", "满18岁"]
         if any(ind in content for ind in age_indicators):
             init.logger.info("  检测到年龄验证页面，尝试通过多种方式进入...")
             initial_url = await browser.get_current_url()
             passed = False
 
             # 尝试多次点击不同文本的按钮
-            click_texts = ["满18岁，请点此进入", "点此进入", "进入论坛", "进入"]
+            click_texts = ["满18岁，请点此进入", "满18岁,请点此进入", "点此进入"]
             for attempt in range(3):
                 for txt in click_texts:
                     try:

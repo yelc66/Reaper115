@@ -9,10 +9,9 @@ import init
 import re
 import time
 from pathlib import Path
-from app.utils.cover_capture import get_movie_cover
 from app.utils.message_queue import add_task_to_queue
 from app.utils.ai import get_movie_tmdb_name_with_ai
-import requests
+from app.utils.media_utils import create_strm_file, notice_emby_scan_library
 from enum import Enum
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -199,93 +198,6 @@ def is_valid_link(link: str) -> DownloadUrlType:
             return url_type
         
     return DownloadUrlType.UNKNOWN
-
-
-def create_strm_file(new_name, file_list):
-    strm_mode = init.bot_config.get('strm_mode', 'disable')
-    # 检查是否需要创建软链
-    if strm_mode == "disable":
-        return
-    try:
-        init.logger.debug(f"Original new_name: {new_name}")
-
-        # 获取根目录
-        cd2_mount_root = Path(init.bot_config.get('mount_root', '/CloudNAS/115'))
-        strm_root = Path(init.bot_config.get('strm_root', '/media/115'))
-
-        # 构建目标路径和 .strm 文件的路径
-        relative_path = Path(new_name).relative_to(Path(new_name).anchor)
-        cd2_mount_path = cd2_mount_root.joinpath(relative_path)
-        strm_path = strm_root.joinpath(relative_path)
-
-        # 日志输出以验证路径
-        init.logger.debug(f"cd2_mount_root: {cd2_mount_root}")
-        init.logger.debug(f"strm_root: {strm_root}")
-        init.logger.debug(f"cd2_mount_path: {cd2_mount_path}")
-        init.logger.debug(f"strm_path: {strm_path}")
-
-        # 确保 strm_path 路径存在
-        if not strm_path.exists():
-            strm_path.mkdir(parents=True, exist_ok=True)
-
-        # 遍历文件列表，创建 .strm 文件
-        for file in file_list:
-            target_file = strm_path / (Path(file).stem + ".strm")
-            if strm_mode == "strm_local":
-                mkv_file = cd2_mount_path / file
-            else:
-                mkv_file = Path(init.bot_config.get('openlist_root', '/115')) / relative_path / (Path(file))
-
-            # 日志输出以验证 .strm 文件和目标文件
-            init.logger.debug(f"target_file (.strm): {target_file}")
-            init.logger.debug(f"mkv_file (.mp4): {mkv_file}")
-
-            # 如果原始文件存在，写入 .strm 文件
-            # if mkv_file.exists():
-            with target_file.open('w', encoding='utf-8') as f:
-                f.write(str(mkv_file))
-                init.logger.info(f"strm文件创建成功，{target_file} -> {mkv_file}")
-            # else:
-            #     init.logger.info(f"原始视频文件[{mkv_file}]不存在！")
-    except Exception as e:
-        init.logger.info(f"Error creating .strm files: {e}")
-
-
-def notice_emby_scan_library(path):
-    strm_root = Path(init.bot_config.get("strm_root", ""))
-    if not strm_root:
-        init.logger.warn("未设置strm_root，无法扫库！")
-        return False
-    relative_path = Path(path).relative_to(Path(path).anchor)
-    movie_path_in_emby = strm_root / relative_path
-    emby_server = init.bot_config['emby_server']
-    api_key = init.bot_config['api_key']
-    if api_key is None or api_key.strip() == "" or api_key.strip().lower() == "your_api_key":
-        init.logger.warn("Emby API Key 未配置，跳过通知Emby扫库")
-        return False
-    if str(emby_server).endswith("/"):
-        emby_server = emby_server[:-1]
-    url = f"{emby_server}/Library/Media/Updated"
-    headers = {
-        "accept": "*/*",
-        "X-Emby-Token": api_key,
-        "Content-Type": "application/json"
-    }
-    data = {
-        "Updates": [
-            {
-                "Path": str(movie_path_in_emby),
-                "UpdateType": "Created"
-            }
-        ]
-    }
-    emby_response = requests.post(url, headers=headers, json=data)
-    if emby_response.text == "":
-        init.logger.info("通知Emby扫库成功！")
-        return True
-    else:
-        init.logger.error(f"通知Emby扫库失败：{emby_response}")
-        return False
 
 
 def save_failed_download_to_db(title, magnet, save_path):
@@ -503,57 +415,22 @@ async def handle_manual_rename(update: Update, context: ContextTypes.DEFAULT_TYP
         file_list = init.openapi_115.get_files_from_dir(new_final_path)
         create_strm_file(new_final_path, file_list)
         
-        # 发送封面图片（如果有的话）
-        cover_url = ""
-        
-        # 根据分类获取封面
-        cover_url = get_movie_cover(new_resource_name)
-        
-        # 检查是否为订阅内容
-        from app.core.subscribe_movie import is_subscribe, update_subscribe
-        if is_subscribe(new_resource_name):
-            # 更新订阅信息
-            update_subscribe(new_resource_name, cover_url, download_url)
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"💡订阅影片`{new_resource_name}`已手动下载成功\\！",
-                parse_mode='MarkdownV2'
-            )
-        
         # 通知Emby扫库
         is_noticed = notice_emby_scan_library(new_final_path)
         if is_noticed:
             message = f"✅ 重命名成功：`{new_resource_name}`\n\n**👻 已通知Emby扫库，请稍后确认！**"
         else:
             message = f"✅ 重命名成功：`{new_resource_name}`\n\n**⚠️ 未能通知Emby，请先配置'EMBY API KEY'！**"
-        if cover_url:
-            try:
-                init.logger.info(f"cover_url: {cover_url}")
-                
-                if not init.aria2_client:
-                    await context.bot.send_photo(
-                        chat_id=update.effective_chat.id, 
-                        photo=cover_url, 
-                        caption=message,
-                        parse_mode='MarkdownV2'
-                    )
-                else:
-                    # 推送到aria2
-                    push2aria2(new_final_path, cover_url, message, update.effective_chat.id)
-            except TelegramError as e:
-                init.logger.warn(f"Telegram API error: {e}")
-            except Exception as e:
-                init.logger.warn(f"Unexpected error: {e}")
-        else:
-            if not init.aria2_client:
-                await context.bot.send_message(
-                                                chat_id=update.effective_chat.id,
-                                                text=message,
-                                                parse_mode='MarkdownV2'
-                )
-            else:
-                # 推送到aria2
-                push2aria2(new_final_path, cover_url, message, update.effective_chat.id)
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=message,
+                parse_mode='MarkdownV2'
+            )
+        except TelegramError as e:
+            init.logger.warn(f"Telegram API error: {e}")
+        except Exception as e:
+            init.logger.warn(f"Unexpected error: {e}")
         
         # 清除重命名数据，结束当前操作
         context.user_data.pop("rename_data", None)
@@ -568,33 +445,6 @@ async def handle_manual_rename(update: Update, context: ContextTypes.DEFAULT_TYP
         # 出错时也清除数据，结束当前操作
         context.user_data.pop("rename_data", None)
         
-        
-def push2aria2(new_final_path, cover_url, message, user_id):
-    
-    # 为Aria2推送创建任务ID系统
-    import uuid
-    push_task_id = str(uuid.uuid4())[:8]
-    
-    # 初始化pending_push_tasks（如果不存在）
-    if not hasattr(init, 'pending_push_tasks'):
-        init.pending_push_tasks = {}
-    
-    # 存储推送任务数据
-    init.pending_push_tasks[push_task_id] = {
-        'path': new_final_path
-    }
-    
-    device_name = init.bot_config.get('aria2', {}).get('device_name', 'Aria2') or 'Aria2'
-    
-    keyboard = [
-        [InlineKeyboardButton(f"推送到{device_name}", callback_data=f"push2aria2_{push_task_id}")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    if cover_url:
-        add_task_to_queue(user_id, cover_url, message=message, keyboard=reply_markup)
-    else:
-        add_task_to_queue(user_id, None, message=message, keyboard=reply_markup)
-
 
 def register_download_handlers(application):
     # 命令形式的下载交互
