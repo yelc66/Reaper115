@@ -80,47 +80,57 @@ def sehua_offline(date=None):
         add_task_to_queue(init.bot_config['allowed_user'], None, message)
         return
 
-    time.sleep(300)
-    domestic_original_count = 0
-    domestic_original_success = 0
-    asia_censored_count = 0
-    asia_censored_success = 0
-    asia_uncensored_count = 0
-    asia_uncensored_success = 0
-    hd_subtitle_count = 0
-    hd_subtitle_success = 0
+    domestic_original_count = sum(1 for i in check_results if i['section_name'] == '国产原创')
+    asia_censored_count = sum(1 for i in check_results if i['section_name'] == '亚洲有码原创')
+    asia_uncensored_count = sum(1 for i in check_results if i['section_name'] == '亚洲无码原创')
+    hd_subtitle_count = sum(1 for i in check_results if i['section_name'] == '高清中文字幕')
 
     success_counters = [0, 0, 0, 0]
-
-    offline_task_status = init.openapi_115.get_offline_tasks()
     images = []
-    time_stamp = int(time.time())
     success_task = []
-    for item in check_results:
-        section_name = item['section_name']
-        magnet = item['magnet']
-        if section_name == '国产原创':
-            domestic_original_count += 1
-        elif section_name == '亚洲有码原创':
-            asia_censored_count += 1
-        elif section_name == '亚洲无码原创':
-            asia_uncensored_count += 1
-        elif section_name == '高清中文字幕':
-            hd_subtitle_count += 1
-        save_path = add_year_month_to_path(init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False), item['save_path'])
-        for task in offline_task_status:
-            if task['url'] == magnet:
-                if task['status'] == 2 and task['percentDone'] == 100:
-                    sehua_success_proccesser(item, save_path, task, success_counters)
-                    images.append(item['image_path'])
-                    if section_name == '国产原创':
-                        success_task.append({"task": task, "save_path": save_path, "image_path": item['image_path']})
-                    else:
-                        success_task.append({"task": task, "save_path": save_path})
+
+    sort_by_ym = init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False)
+    pending = {item['id']: item for item in check_results}
+
+    POLL_INTERVAL = 30
+    MAX_WAIT = 3600
+    elapsed = 0
+
+    init.logger.info(f"开始轮询检查 {len(pending)} 个离线任务，每 {POLL_INTERVAL} 秒一次，最长等待 {MAX_WAIT} 秒...")
+
+    while pending and elapsed < MAX_WAIT:
+        time.sleep(POLL_INTERVAL)
+        elapsed += POLL_INTERVAL
+
+        offline_task_status = init.openapi_115.get_offline_tasks()
+        task_map = {task['url']: task for task in offline_task_status}
+
+        done_ids = []
+        for item_id, item in pending.items():
+            magnet = item['magnet']
+            section_name = item['section_name']
+            save_path = add_year_month_to_path(sort_by_ym, item['save_path'])
+            task = task_map.get(magnet)
+            if task is None:
+                continue
+            if task['status'] == 2 and task['percentDone'] == 100:
+                sehua_success_proccesser(item, save_path, task, success_counters)
+                images.append(item['image_path'])
+                if section_name == '国产原创':
+                    success_task.append({"task": task, "save_path": save_path, "image_path": item['image_path']})
                 else:
-                    init.logger.warn(f"{item['title']} 离线下载失败或未完成。")
-                    init.openapi_115.del_offline_task(task['info_hash'])
-                break
+                    success_task.append({"task": task, "save_path": save_path})
+                done_ids.append(item_id)
+
+        for item_id in done_ids:
+            del pending[item_id]
+
+        if pending:
+            init.logger.info(f"还有 {len(pending)} 个任务下载中，已等待 {elapsed} 秒...")
+
+    if pending:
+        for item in pending.values():
+            init.logger.warn(f"{item['title']} 超时未完成（等待 {MAX_WAIT} 秒），跳过。")
 
     wait_for_message_queue_completion("涩花")
 

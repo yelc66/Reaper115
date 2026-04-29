@@ -95,7 +95,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$ROOT_DIR"
-mkdir -p config tmp media CloudNAS
+mkdir -p config tmp
 
 if [ ! -f "$ROOT_DIR/.env" ] && [ -f "$ROOT_DIR/.env.example" ]; then
   cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"

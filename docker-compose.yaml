@@ -28,8 +28,6 @@ services:
     volumes:
       - ${CONFIG_DIR:-./config}:/config  # 配置目录
       - ${TMP_DIR:-./tmp}:/tmp        # 临时目录
-      - ${MEDIA_DIR:-./media}:/media    # 媒体目录（软链目录）
-      - ${CLOUDNAS_DIR:-./CloudNAS}:/CloudNAS:rslave # CD2挂载目录
 
   # 需要额外部署 FlareSolverr 服务时取消注释此部分
   flaresolverr:

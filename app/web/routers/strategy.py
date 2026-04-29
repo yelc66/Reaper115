@@ -12,10 +12,11 @@ router = APIRouter(prefix="/api/strategy", tags=["strategy"])
 
 
 class StrategyRule(BaseModel):
+    site: str
     section_name: str
-    strategy_name: str
+    name: str
     pattern: str
-    specify_save_path: str | None = ""
+    save_path: str | None = ""
 
 
 class StrategyTestRequest(BaseModel):
@@ -23,64 +24,92 @@ class StrategyTestRequest(BaseModel):
     title: str
 
 
-def _load_rules():
-    data = read_yaml(init.STRATEGY_FILE)
-    rules = data.get("title_regular") or []
-    return data, rules
+def _load_flat(data: dict) -> list[dict]:
+    """将嵌套结构 {site: {section: [rule]}} 展平为带 id 的列表"""
+    flat = []
+    for site, sections in data.items():
+        if not isinstance(sections, dict):
+            continue
+        for section_name, rules in sections.items():
+            if not isinstance(rules, list):
+                continue
+            for rule in rules:
+                flat.append({
+                    "site": site,
+                    "section_name": section_name,
+                    "name": rule.get("name", ""),
+                    "pattern": rule.get("pattern", ""),
+                    "save_path": rule.get("save_path") or "",
+                })
+    return flat
 
 
-def _normalize_rule(rule: StrategyRule):
-    normalized = {
-        "section_name": rule.section_name.strip(),
-        "strategy_name": rule.strategy_name.strip(),
-        "pattern": rule.pattern.strip(),
-        "specify_save_path": (rule.specify_save_path or "").strip(),
-    }
-    if normalized["specify_save_path"] and not normalized["specify_save_path"].startswith("/"):
-        normalized["specify_save_path"] = f"/{normalized['specify_save_path']}"
-    if not normalized["section_name"] or not normalized["strategy_name"] or not normalized["pattern"]:
-        raise HTTPException(status_code=400, detail="section_name, strategy_name and pattern are required")
-    return normalized
+def _flat_to_nested(flat: list[dict]) -> dict:
+    """将展平列表重新组装为嵌套结构"""
+    data: dict = {}
+    for rule in flat:
+        site = rule["site"]
+        section = rule["section_name"]
+        data.setdefault(site, {}).setdefault(section, []).append({
+            "name": rule["name"],
+            "pattern": rule["pattern"],
+            "save_path": rule["save_path"] or "",
+        })
+    return data
+
+
+def _normalize(rule: StrategyRule) -> dict:
+    site = rule.site.strip()
+    section_name = rule.section_name.strip()
+    name = rule.name.strip()
+    pattern = rule.pattern.strip()
+    save_path = (rule.save_path or "").strip()
+    if save_path and not save_path.startswith("/"):
+        save_path = f"/{save_path}"
+    if not site or not section_name or not name or not pattern:
+        raise HTTPException(status_code=400, detail="site, section_name, name and pattern are required")
+    return {"site": site, "section_name": section_name, "name": name, "pattern": pattern, "save_path": save_path}
 
 
 @router.get("/rules")
 def list_rules():
-    _, rules = _load_rules()
-    return {"items": [{**rule, "id": index} for index, rule in enumerate(rules)]}
+    data = read_yaml(init.STRATEGY_FILE)
+    flat = _load_flat(data)
+    return {"items": [{**rule, "id": idx} for idx, rule in enumerate(flat)]}
 
 
 @router.post("/rules")
 def create_rule(rule: StrategyRule):
-    normalized_rule = _normalize_rule(rule)
-    validate_regex(normalized_rule["pattern"])
-    data, rules = _load_rules()
-    rules.append(normalized_rule)
-    data["title_regular"] = rules
-    write_yaml(init.STRATEGY_FILE, data)
-    return {"ok": True, "id": len(rules) - 1}
+    normalized = _normalize(rule)
+    validate_regex(normalized["pattern"])
+    data = read_yaml(init.STRATEGY_FILE)
+    flat = _load_flat(data)
+    flat.append(normalized)
+    write_yaml(init.STRATEGY_FILE, _flat_to_nested(flat))
+    return {"ok": True, "id": len(flat) - 1}
 
 
 @router.put("/rules/{rule_id}")
 def update_rule(rule_id: int, rule: StrategyRule):
-    normalized_rule = _normalize_rule(rule)
-    validate_regex(normalized_rule["pattern"])
-    data, rules = _load_rules()
-    if rule_id < 0 or rule_id >= len(rules):
+    normalized = _normalize(rule)
+    validate_regex(normalized["pattern"])
+    data = read_yaml(init.STRATEGY_FILE)
+    flat = _load_flat(data)
+    if rule_id < 0 or rule_id >= len(flat):
         raise HTTPException(status_code=404, detail="Strategy rule not found")
-    rules[rule_id] = normalized_rule
-    data["title_regular"] = rules
-    write_yaml(init.STRATEGY_FILE, data)
+    flat[rule_id] = normalized
+    write_yaml(init.STRATEGY_FILE, _flat_to_nested(flat))
     return {"ok": True}
 
 
 @router.delete("/rules/{rule_id}")
 def delete_rule(rule_id: int):
-    data, rules = _load_rules()
-    if rule_id < 0 or rule_id >= len(rules):
+    data = read_yaml(init.STRATEGY_FILE)
+    flat = _load_flat(data)
+    if rule_id < 0 or rule_id >= len(flat):
         raise HTTPException(status_code=404, detail="Strategy rule not found")
-    deleted = rules.pop(rule_id)
-    data["title_regular"] = rules
-    write_yaml(init.STRATEGY_FILE, data)
+    deleted = flat.pop(rule_id)
+    write_yaml(init.STRATEGY_FILE, _flat_to_nested(flat))
     return {"ok": True, "deleted": deleted}
 
 

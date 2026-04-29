@@ -1,9 +1,8 @@
-title_regular:
-- section_name: 高清中文字幕
-  strategy_name: 无码字幕
-  pattern: 无码字幕
-  specify_save_path: /AV/涩花/无码字幕
-- section_name: 高清中文字幕
-  strategy_name: 无码破解
-  pattern: 无码破解
-  specify_save_path: /AV/涩花/无码破解
+sehuatang:
+  高清中文字幕:
+    - name: 无码字幕
+      pattern: 无码字幕
+      save_path: /AV/涩花/无码字幕
+    - name: 无码破解
+      pattern: 无码破解
+      save_path: /AV/涩花/无码破解

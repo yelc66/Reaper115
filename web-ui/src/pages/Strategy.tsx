@@ -29,6 +29,7 @@ type CrawlerFormState = {
   sehuaBaseUrl: string;
   sehuaCookieString: string;
   sehuaNotifyMe: boolean;
+  sehuaNotifyWithImage: boolean;
   sehuaSortByYearMonth: boolean;
   sehuaSections: SehuaSection[];
 };
@@ -42,6 +43,7 @@ function toCrawlerFormState(config: Record<string, unknown>): CrawlerFormState {
     sehuaBaseUrl: (sehuaConfig.base_url as string) || "www.sehuatang.net",
     sehuaCookieString: (sehuaConfig.cookie_string as string) || "",
     sehuaNotifyMe: sehuaConfig.notify_me !== false,
+    sehuaNotifyWithImage: sehuaConfig.notify_with_image !== false,
     sehuaSortByYearMonth: (sehuaConfig.sort_by_year_month as boolean) || false,
     sehuaSections: ((sehuaConfig.sections as Array<{ name: string; save_path: string }> | undefined) || []).map(
       (section) => ({
@@ -65,6 +67,7 @@ function toCrawlerApiConfig(
       base_url: formState.sehuaBaseUrl,
       cookie_string: formState.sehuaCookieString.trim(),
       notify_me: formState.sehuaNotifyMe,
+      notify_with_image: formState.sehuaNotifyWithImage,
       sort_by_year_month: formState.sehuaSortByYearMonth,
       sections: formState.sehuaSections
         .map((section) => ({
@@ -77,10 +80,11 @@ function toCrawlerApiConfig(
 }
 
 const EMPTY_RULE: StrategyRuleInput = {
+  site: "sehuatang",
   sectionName: "",
-  strategyName: "",
+  name: "",
   pattern: "",
-  specifySavePath: "",
+  savePath: "",
 };
 
 function uniqueValues(values: string[]) {
@@ -95,10 +99,11 @@ function normalizeSavePath(value?: string | null) {
 
 function normalizeRuleInput(rule: StrategyRuleInput): StrategyRuleInput {
   return {
+    site: rule.site.trim(),
     sectionName: rule.sectionName.trim(),
-    strategyName: rule.strategyName.trim(),
+    name: rule.name.trim(),
     pattern: rule.pattern.trim(),
-    specifySavePath: normalizeSavePath(rule.specifySavePath),
+    savePath: normalizeSavePath(rule.savePath),
   };
 }
 
@@ -180,6 +185,12 @@ function CrawlerConfigPanel() {
           <Switch
             checked={formState.sehuaNotifyMe}
             onCheckedChange={(checked) => patchForm("sehuaNotifyMe", checked)}
+          />
+        </Row>
+        <Row label="推送附带封面图片" hint="关闭可跳过图片下载，加快爬取速度">
+          <Switch
+            checked={formState.sehuaNotifyWithImage}
+            onCheckedChange={(checked) => patchForm("sehuaNotifyWithImage", checked)}
           />
         </Row>
         <Row label="按年月整理">
@@ -299,10 +310,11 @@ export function StrategyRulesManager() {
   useEffect(() => {
     if (editingRule) {
       setFormState({
+        site: editingRule.site,
         sectionName: editingRule.sectionName,
-        strategyName: editingRule.strategyName,
+        name: editingRule.name,
         pattern: editingRule.pattern,
-        specifySavePath: editingRule.specifySavePath || "",
+        savePath: editingRule.savePath || "",
       });
     }
   }, [editingRule]);
@@ -310,7 +322,7 @@ export function StrategyRulesManager() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const normalizedRule = normalizeRuleInput(formState);
-    if (!normalizedRule.sectionName || !normalizedRule.strategyName || !normalizedRule.pattern) return;
+    if (!normalizedRule.site || !normalizedRule.sectionName || !normalizedRule.name || !normalizedRule.pattern) return;
     if (editingRule) {
       updateMutation.mutate({ id: editingRule.id, rule: normalizedRule });
       return;
@@ -329,8 +341,9 @@ export function StrategyRulesManager() {
               <table className="min-w-full text-sm">
                 <thead className="border-b border-border text-left text-muted-foreground">
                   <tr>
-                    <th className="py-2 pr-4 font-medium">策略</th>
+                    <th className="py-2 pr-4 font-medium">站点</th>
                     <th className="py-2 pr-4 font-medium">版块</th>
+                    <th className="py-2 pr-4 font-medium">规则名</th>
                     <th className="py-2 pr-4 font-medium">正则</th>
                     <th className="py-2 pr-4 font-medium">保存路径</th>
                     <th className="py-2 pr-4 text-right font-medium">操作</th>
@@ -339,10 +352,11 @@ export function StrategyRulesManager() {
                 <tbody className="divide-y divide-border">
                   {rulesQuery.data.items.map((rule) => (
                     <tr key={rule.id}>
-                      <td className="py-3 pr-4 font-medium">{rule.strategyName}</td>
+                      <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{rule.site}</td>
                       <td className="py-3 pr-4">{rule.sectionName}</td>
+                      <td className="py-3 pr-4 font-medium">{rule.name}</td>
                       <td className="max-w-sm py-3 pr-4 font-mono text-xs">{rule.pattern}</td>
-                      <td className="py-3 pr-4 text-muted-foreground">{rule.specifySavePath || "-"}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{rule.savePath || "-"}</td>
                       <td className="py-3 pr-4">
                         <div className="flex justify-end gap-2">
                           <Button size="icon" variant="secondary" onClick={() => setEditingRule(rule)} aria-label="编辑">
@@ -370,6 +384,12 @@ export function StrategyRulesManager() {
           <Card>
             <h2 className="mb-4 text-base font-semibold">{editingRule ? "编辑规则" : "新增规则"}</h2>
             <form className="space-y-3" onSubmit={handleSubmit}>
+              <Input
+                required
+                placeholder="站点（如 sehuatang）"
+                value={formState.site}
+                onChange={(event) => setFormState({ ...formState, site: event.target.value })}
+              />
               <Select
                 required
                 value={formState.sectionName}
@@ -386,9 +406,9 @@ export function StrategyRulesManager() {
               </Select>
               <Input
                 required
-                placeholder="策略名称"
-                value={formState.strategyName}
-                onChange={(event) => setFormState({ ...formState, strategyName: event.target.value })}
+                placeholder="规则名称"
+                value={formState.name}
+                onChange={(event) => setFormState({ ...formState, name: event.target.value })}
               />
               <Input
                 required
@@ -398,8 +418,8 @@ export function StrategyRulesManager() {
               />
               <Input
                 placeholder="指定保存路径"
-                value={formState.specifySavePath || ""}
-                onChange={(event) => setFormState({ ...formState, specifySavePath: event.target.value })}
+                value={formState.savePath || ""}
+                onChange={(event) => setFormState({ ...formState, savePath: event.target.value })}
               />
               <div className="flex gap-2">
                 <Button loading={createMutation.isPending || updateMutation.isPending} type="submit">

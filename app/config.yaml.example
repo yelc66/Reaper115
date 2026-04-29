@@ -23,17 +23,17 @@ bot_token: your_bot_token
 # 数字类型不要引号
 allowed_user: your_user_id
 
-# 机器人名称 例如：@your_bot_name 
+# 机器人名称 例如：@your_bot_name
 # 非必填，转存视频需要
 bot_name: "@your_bot_name"
 
-# telegram 的api信息 
+# telegram 的api信息
 # 非必填，转存视频需要
 tg_api_id: your_tg_api_id
 tg_api_hash: your_tg_api_hash
 
 ############################################115开放平台##################################
-# 115_app_id 
+# 115_app_id
 # 申请地址https://open.115.com/
 # 如已填写115_app_id, access_token,refresh_token可留空！
 115_app_id: your_115_app_id
@@ -123,9 +123,11 @@ sehuatang_spider:
 
   # 通知我
   notify_me: true
+  # 推送通知时是否附带封面图片；设为 false 可跳过图片下载，加快爬取速度
+  notify_with_image: true
   # 按年月整理，开启后会自动在保存目录创建年/月的文件夹
   sort_by_year_month: false
-  
+
 
 #############################################电影订阅####################################
 # 如果留空则无法通过“sm”命令订阅电影

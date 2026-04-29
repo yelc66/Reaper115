@@ -19,8 +19,6 @@ PY
 
 test -f config/config.yaml
 test -d tmp
-test -d media
-test -d CloudNAS
 
 if [ -d "/Applications/Google Chrome.app" ]; then
   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version

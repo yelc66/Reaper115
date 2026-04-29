@@ -63,19 +63,21 @@ export function mapSehuaListResponse(response: SehuaListResponseDto): SehuaListR
 export function mapStrategyRule(rule: StrategyRuleDto): StrategyRule {
   return {
     id: rule.id,
+    site: rule.site,
     sectionName: rule.section_name,
-    strategyName: rule.strategy_name,
+    name: rule.name,
     pattern: rule.pattern,
-    specifySavePath: rule.specify_save_path,
+    savePath: rule.save_path,
   };
 }
 
 export function toStrategyRuleInputDto(rule: StrategyRuleInput): StrategyRuleInputDto {
   return {
+    site: rule.site,
     section_name: rule.sectionName,
-    strategy_name: rule.strategyName,
+    name: rule.name,
     pattern: rule.pattern,
-    specify_save_path: rule.specifySavePath,
+    save_path: rule.savePath,
   };
 }
 

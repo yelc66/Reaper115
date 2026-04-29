@@ -126,7 +126,7 @@ The Docker image reads `/config/config.yaml`. For local development, use `script
 ```bash
 /opt/homebrew/bin/python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-mkdir -p config tmp media CloudNAS
+mkdir -p config tmp
 cp config/config.yaml.example config/config.yaml
 ./scripts/dev.sh
 ```

@@ -44,10 +44,11 @@ export type SehuaListResponseDto = {
 
 export type StrategyRuleDto = {
   id: number;
+  site: string;
   section_name: string;
-  strategy_name: string;
+  name: string;
   pattern: string;
-  specify_save_path?: string | null;
+  save_path?: string | null;
 };
 
 export type StrategyRuleInputDto = Omit<StrategyRuleDto, "id">;

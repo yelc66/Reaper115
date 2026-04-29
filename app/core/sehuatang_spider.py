@@ -628,8 +628,9 @@ async def parse_topic(section_name, html, url, date):
         img_tag = postmessage.find('img', {'zoomfile': True})
         result['post_url'] = img_tag['zoomfile'] if img_tag else None
         
-        # 下载图片到本地保存到tmp
-        if result['post_url']:
+        # 下载图片到本地保存到tmp（可通过 notify_with_image 配置跳过）
+        notify_with_image = init.bot_config.get('sehuatang_spider', {}).get('notify_with_image', True)
+        if result['post_url'] and notify_with_image:
             success, local_path = await download_image(result['post_url'], f"{init.TEMP}/sehua")
             if success:
                 init.logger.debug(f"图片已下载到: {local_path}")
@@ -744,6 +745,19 @@ async def get_section_update(section_name, date, end_date=None):
     return all_data_today
 
 
+def _extract_tid(link):
+    """从帖子链接中提取 tid，支持 thread-TID-x-x.html 和 ?tid=TID 两种格式"""
+    from urllib.parse import urlparse, parse_qs
+    # 格式1: thread-123456-1-1.html
+    m = re.search(r'thread-(\d+)-', link)
+    if m:
+        return m.group(1)
+    # 格式2: forum.php?mod=viewthread&tid=123456
+    qs = parse_qs(urlparse(link).query)
+    tid = qs.get('tid', [None])[0]
+    return tid
+
+
 def parse_section_page(html_content, date, page_num, section_name, end_date=None):
     topics = []
     soup = BeautifulSoup(html_content, "html.parser")
@@ -798,11 +812,16 @@ def parse_section_page(html_content, date, page_num, section_name, end_date=None
               
         # 提取链接（从标题的a标签的href属性）
         link = title_link['href'].replace('&amp;', '&') if title_link else ""
-        if '-' in link:
-            topic_id = link.split('-')[1]
+        if not link:
+            init.logger.info(f"  跳过帖子[{title}]: title_link 未找到（class='s xst' 不匹配?）")
+            continue
+        topic_id = _extract_tid(link)
+        if topic_id:
             topic_link = f"forum.php?mod=viewthread&tid={topic_id}&extra=page%3D1"
             topics.append({"url": topic_link, "date": normalized_topic_date})
             init.logger.info(f"找到目标时间范围帖子: {title}...")
+        else:
+            init.logger.info(f"  跳过帖子[{title}]: 链接格式无法解析 ({link})")
     
     # 调试信息：显示找到的所有唯一日期
     unique_dates = list(set(found_dates))
@@ -810,7 +829,7 @@ def parse_section_page(html_content, date, page_num, section_name, end_date=None
     init.logger.debug(f"  目标时间范围: {date_label}")
     init.logger.debug(f"  匹配的目标时间范围帖子数量: {len(topics)}")
     if date_match_count and not topics:
-        init.logger.info(f"  第 {page_num} 页日期命中 {date_match_count} 个，但策略命中 0 个")
+        init.logger.info(f"  第 {page_num} 页日期命中 {date_match_count} 个，但无法加入队列（策略过滤或链接解析失败）")
         for sample in strategy_skip_samples:
             init.logger.info(f"  策略跳过示例: {sample}")
     
@@ -957,7 +976,6 @@ def save_sehua2db(results):
                 
                 # 判断数据完整性
                 if not result.get('section_name') or \
-                    not result.get('av_number') or \
                     not result.get('title') or \
                     not result.get('magnet') or \
                     not result.get('size') or \
@@ -965,8 +983,7 @@ def save_sehua2db(results):
                     not result.get('post_url') or \
                     not result.get('publish_date') or \
                     not result.get('pub_url') or \
-                    not specify_path or \
-                    not result.get('image_path'):
+                    not specify_path:
                     init.logger.warn(f"数据不完整，跳过入库: {result}")
                     continue
                 
@@ -1000,80 +1017,41 @@ def save_sehua2db(results):
         init.logger.error(f"保存涩花数据到数据库时出错: {str(e)}")
         
         
+def _get_section_rules(strategy_config, site, section_name):
+    return (strategy_config.get(site) or {}).get(section_name) or []
+
+
 def is_title_allowed(section_name, title):
-    yaml_path = init.STRATEGY_FILE
-    strategy_config = read_yaml_file(yaml_path)
+    strategy_config = read_yaml_file(init.STRATEGY_FILE)
     if not strategy_config:
         return True
-    
-    if strategy_config:
-        title_regular = strategy_config.get('title_regular', [])
-        if not title_regular:
+    section_rules = _get_section_rules(strategy_config, 'sehuatang', section_name)
+    if not section_rules:
+        return True
+    for rule in section_rules:
+        pattern = rule.get('pattern', '')
+        if pattern and re.search(pattern, title, re.IGNORECASE):
             return True
-        
-        section_has_rules = False
-        for item in title_regular:
-            if item.get('section_name', '') == section_name:
-                section_has_rules = True
-                break
-        
-        if not section_has_rules:
-            return True
-        
-        for item in title_regular:
-            if item.get('section_name', '') == section_name:
-                pattern = item.get('pattern', '')
-                if not pattern:
-                    continue
-                if re.search(pattern, title, re.IGNORECASE):
-                    return True
-        
-        return False
-        
-    return True
+    return False
 
 
 def match_strategy(result):
-    yaml_path = init.STRATEGY_FILE
-    strategy_config = read_yaml_file(yaml_path)
+    strategy_config = read_yaml_file(init.STRATEGY_FILE)
     if not strategy_config:
         return True, result.get('save_path')
-    
-    if strategy_config:
-        title_regular = strategy_config.get('title_regular', [])
-        if not title_regular:
-            return True, result.get('save_path')
-        
-        current_section = result.get('section_name', '')
-        section_has_rules = False
-        
-        # 检查当前section是否有配置规则
-        for item in title_regular:
-            if item.get('section_name', '') == current_section:
-                section_has_rules = True
-                break
-        
-        # 如果当前section没有配置规则，默认全部通过
-        if not section_has_rules:
-            return True, result.get('save_path')
-        
-        # 有配置规则的section，需要匹配正则
-        for item in title_regular:
-            if item.get('section_name', '') == current_section:
-                pattern = item.get('pattern', '')
-                if not pattern:
-                    continue
-                if re.search(pattern, result.get('title', ''), re.IGNORECASE):
-                    strategy_name = item.get('strategy_name', item.get('name', '未知策略'))
-                    init.logger.info(f"标题[{result.get('title', '')}]匹配正则[{strategy_name}]成功!")
-                    # 正确处理空值：如果specify_save_path为空值，使用默认路径
-                    specify_path = item.get('specify_save_path') or result.get('save_path')
-                    return True, specify_path
-        
-        return False, None
-        
-    # 空的配置等同于无效策略，默认全部通过
-    return True, result.get('save_path')
+    section_name = result.get('section_name', '')
+    section_rules = _get_section_rules(strategy_config, 'sehuatang', section_name)
+    if not section_rules:
+        return True, result.get('save_path')
+    title = result.get('title', '')
+    for rule in section_rules:
+        pattern = rule.get('pattern', '')
+        if pattern and re.search(pattern, title, re.IGNORECASE):
+            name = rule.get('name', '未知策略')
+            init.logger.info(f"标题[{title}]匹配规则[{name}]成功!")
+            save_path = rule.get('save_path') or result.get('save_path')
+            return True, save_path
+    return False, None
 
 
 def get_sehua_save_path(_section_name):
