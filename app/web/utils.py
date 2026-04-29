@@ -89,6 +89,19 @@ def parse_crawl_date(value: str | None):
     raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD or YYYYMMDD")
 
 
+def parse_crawl_date_range(start_value: str | None, end_value: str | None = None):
+    if start_value and not end_value:
+        match = re.match(r"^\s*(\d{4}-?\d{2}-?\d{2})\s*(?:至|到|~|-{2}|,)\s*(\d{4}-?\d{2}-?\d{2})\s*$", start_value)
+        if match:
+            start_value, end_value = match.groups()
+
+    start_date = parse_crawl_date(start_value)
+    end_date = parse_crawl_date(end_value) if end_value else start_date
+    if datetime.strptime(start_date, "%Y-%m-%d") > datetime.strptime(end_date, "%Y-%m-%d"):
+        start_date, end_date = end_date, start_date
+    return start_date, end_date
+
+
 def validate_regex(pattern: str):
     try:
         re.compile(pattern)

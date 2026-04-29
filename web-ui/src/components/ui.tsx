@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -20,14 +26,12 @@ export function Button({
     <button
       className={cn(
         "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "primary" &&
-          "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80",
+        variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80",
         variant === "secondary" &&
           "border border-border bg-surface-elevated text-foreground hover:bg-surface-elevated/80",
         variant === "ghost" &&
           "border border-transparent bg-transparent text-muted-foreground hover:bg-surface-elevated hover:text-foreground",
-        variant === "danger" &&
-          "bg-destructive/10 text-red-400 border border-destructive/20 hover:bg-destructive/20",
+        variant === "danger" && "border border-destructive/20 bg-destructive/10 text-red-400 hover:bg-destructive/20",
         size === "sm" && "h-7 px-2.5 text-xs",
         size === "md" && "h-8 px-3.5",
         size === "icon" && "h-8 w-8 p-0",

@@ -79,23 +79,9 @@ category_folder:
       - name: 祼の真
         path: /AV/无码
 
-#############################################AV日更#######################################
-# 自动同步最新AV
-av_daily_update:
-  # 是否开启日更功能
-  enable: false
-  # 指定每天的同步时间(24h)建议设置为20:00
-  sync_time: "20:00"
-  # 离线到115的保存路径
-  save_path: /AV/日更
-  # 通知我
-  notify_me: true
-  # 按年月整理，开启后会自动在保存目录创建年/月的文件夹
-  sort_by_year_month: false
-
 #############################################涩花Spider##################################
 # 每天凌晨开启爬虫，爬取前一天的数据并离线到115
-sehua_spider:
+sehuatang_spider:
   # 是否开启涩花爬虫
   enable: false
   # 指定每天的同步时间(24h)建议设置为03:00
@@ -106,6 +92,15 @@ sehua_spider:
   # 涩花地址，建议填临时地址，速度快~
   # 留空默认永久地址 www.sehuatang.net; www.sehuatang.org
   base_url: www.sehuatang.net
+  # 涩花 Cookie，可从浏览器开发者工具复制 Cookie 请求头，格式: a=b; c=d
+  # 建议只填当前 base_url 域名下的 Cookie，留空则不注入
+  cookie_string: ""
+  # 也支持结构化 Cookie；与 cookie_string 可同时使用
+  # cookies:
+  #   - name: example_name
+  #     value: example_value
+  #     domain: .sehuatang.net
+  #     path: /
   # 支持爬取版块["国产原创", "亚洲无码原创", "亚洲有码原创", "高清中文字幕", "素人有码系列","4K原版","VR视频区","欧美无码"]
   # 至少填一个
   sections:
@@ -131,30 +126,6 @@ sehua_spider:
   # 按年月整理，开启后会自动在保存目录创建年/月的文件夹
   sort_by_year_month: false
   
-#############################################软链接设置####################################
-# strm可以极大地减小请求115的次数避免风控，建议开启
-# 可选值：
-# - strm_302        # strm + OpenList 302（推荐, 需要自己部署go-emby2openlist）
-# - strm_local      # 只生成本地strm，与原strm方式一致，需要CD2，不走 302 (不推荐）
-# - disable         # 都不使用
-strm_mode: strm_302
-
-# strm文件存放路径(Emby挂载路径)
-strm_root: /media/115
-
-# OpenList 115挂载根路径(302用)
-openlist_root: /115
-
-# CD2 115根目录
-mount_root: /CloudNAS/115
-
-
-#############################################EMBY设置####################################
-# 有新资源入库时会同时Emby扫库，所有媒体库建议按“加入日期”到排序
-# EmbyServer地址 格式 http(s)://ip(域名):端口
-emby_server: http://your_emby_server:8096
-# Emby APIkey  Emby-->API秘钥-->新建
-api_key: your_api_key
 
 #############################################电影订阅####################################
 # 如果留空则无法通过“sm”命令订阅电影

@@ -5,14 +5,14 @@ import init
 import threading
 from apscheduler.triggers.interval import IntervalTrigger
 from app.handlers.offline_task_handler import try_to_offline2115_again
-from app.core.sehua_spider import sehua_spider_start
+from app.core.sehuatang_spider import sehuatang_spider_start
 from app.core.offline_task_retry import offline_task_retry
 
 scheduler = BlockingScheduler()
 
 def get_sehua_sync_time():
     sync_time = {'hour': 3, 'minute': 0}
-    sehua_config = init.bot_config.get("sehua_spider") or {}
+    sehua_config = init.bot_config.get("sehuatang_spider") or {}
     sehua_sync_time = sehua_config.get("sync_time", "03:00")
     try:
         hour, minute = map(int, sehua_sync_time.split(":"))
@@ -39,7 +39,7 @@ def init_tasks():
         {"id": "offline_task_retry_task", "func": offline_task_retry, "hour": "9,18", "minute": 0, "task_type": "time"},
         {"id": "retry_failed_downloads", "func": try_to_offline2115_again, "interval": 12 * 60 * 60, "task_type": "interval"},
         {"id": "clear_request_count_task", "func": clear_request_count, "hour": 0, "minute": 0, "task_type": "time"},
-        {"id": "sehua_spider_task", "func": sehua_spider_start, "hour": sehua_sync_time.get("hour", 3), "minute": sehua_sync_time.get("minute", 0), "task_type": "time"}
+        {"id": "sehuatang_spider_task", "func": sehuatang_spider_start, "hour": sehua_sync_time.get("hour", 3), "minute": sehua_sync_time.get("minute", 0), "task_type": "time"}
     ]
 
 

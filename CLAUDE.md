@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Telegram-115Bot** is a Telegram bot that manages 115 Network Disk: offline downloads, sehua spider, directory sync, and STRM file generation for Emby.
+**Telegram-115Bot** is a Telegram bot that manages 115 Network Disk: offline downloads, sehua spider, directory sync, and advertisement file cleanup.
 
 The active development branch is **`feature/sehua-web`**, which narrows the bot to sehua-only crawling and adds a FastAPI web management UI. Phase 1 (Python backend cleanup) and Phase 2 (FastAPI routes) are complete; Phase 3 (React web UI) is next.
 
@@ -39,6 +39,7 @@ There are no test commands — the project has no automated test suite.
 ### Entry & Startup Flow
 
 `app/115bot.py` is the entry point. On startup:
+
 1. `init.init()` — loads YAML config, creates logger, creates SQLite tables, creates `/tmp`
 2. A background thread starts `queue_worker` (the TG message send loop)
 3. `init.initialize_115open()` — initializes the 115 Open API client
@@ -50,20 +51,21 @@ There are no test commands — the project has no automated test suite.
 
 All shared state lives as module-level globals in `init.py` and is accessed via `import init` throughout every file:
 
-| Global | Type | Purpose |
-|---|---|---|
-| `init.bot_config` | dict | Loaded from `/config/config.yaml` |
-| `init.logger` | Logger | Custom logger (file + console) |
-| `init.openapi_115` | OpenAPI_115 | 115 Open Platform client |
-| `init.CRAWL_SEHUA_STATUS` | int | 0=idle, 1=running (prevents concurrent crawls) |
-| `init.tg_user_client` | None | Stub — telethon removed in sehua-web branch |
-| `init.DB_FILE` | str | `/config/db.db` |
+| Global                    | Type        | Purpose                                        |
+| ------------------------- | ----------- | ---------------------------------------------- |
+| `init.bot_config`         | dict        | Loaded from `/config/config.yaml`              |
+| `init.logger`             | Logger      | Custom logger (file + console)                 |
+| `init.openapi_115`        | OpenAPI_115 | 115 Open Platform client                       |
+| `init.CRAWL_SEHUA_STATUS` | int         | 0=idle, 1=running (prevents concurrent crawls) |
+| `init.tg_user_client`     | None        | Stub — telethon removed in sehua-web branch    |
+| `init.DB_FILE`            | str         | `/config/db.db`                                |
 
 ### Database (SQLite via `app/utils/sqlitelib.py`)
 
 Used as a context manager: `with SqlLiteLib() as sqlite: sqlite.query_all(sql)`.
 
 Key tables:
+
 - `sehua_data` — crawled sehua resources (main table for sehua-web)
 - `offline_task` — failed downloads pending retry
 
@@ -74,6 +76,7 @@ Background `asyncio.Queue` runs in its own thread/event loop. All TG notificatio
 ### 115 API (`app/core/open_115.py`)
 
 Wraps the 115 Open Platform REST API. Key methods used everywhere:
+
 - `offline_download_specify_path(url, path)` — submit offline download
 - `get_offline_tasks()` — poll task status
 - `del_offline_task(info_hash)` — delete cloud task
@@ -81,26 +84,20 @@ Wraps the 115 Open Platform REST API. Key methods used everywhere:
 - `rename(old_path, new_name)` — rename in 115
 - `get_files_from_dir(path)` — list files
 
-### Sehua Spider (`app/core/sehua_spider.py`)
+### Sehua Spider (`app/core/sehuatang_spider.py`)
 
-Uses SeleniumBase (with optional remote Selenium via `REMOTE_SELENIUM_URL`) or FlareSolverr (`FLARESOLVERR_URL`) to scrape sehuatang.net. Sections and save paths come from `config.yaml` → `sehua_spider.sections`. Filter rules are in `/config/crawling_strategy.yaml`.
+Uses SeleniumBase (with optional remote Selenium via `REMOTE_SELENIUM_URL`) or FlareSolverr (`FLARESOLVERR_URL`) to scrape sehuatang.net. Sections and save paths come from `config.yaml` → `sehuatang_spider.sections`. Filter rules are in `/config/crawling_strategy.yaml`.
 
 Two entry points:
-- `sehua_spider_start()` — scheduled, crawls yesterday
-- `sehua_spider_by_date(date)` — manual via `/csh` command
 
-### STRM / Emby Integration (`app/utils/media_utils.py`)
-
-After successful offline download:
-1. `create_strm_file(115_path, file_list)` — writes `.strm` files to `strm_root`
-2. `notice_emby_scan_library(115_path)` — POSTs to Emby API
-
-`strm_mode` in config controls behavior: `strm_302` (OpenList), `strm_local` (CD2 mount), or `disable`.
+- `sehuatang_spider_start()` — scheduled, crawls yesterday
+- `sehuatang_spider_by_date(date)` — manual via `/csh` command
 
 ### Scheduler (`app/core/scheduler.py`)
 
 APScheduler `BlockingScheduler` in a daemon thread. Active jobs on `feature/sehua-web`:
-- `sehua_spider_task` — cron, configurable time (default 03:00)
+
+- `sehuatang_spider_task` — cron, configurable time (default 03:00)
 - `offline_task_retry_task` — cron 09:00 and 18:00
 - `retry_failed_downloads` — interval every 12h
 - `clear_request_count_task` — cron midnight
@@ -110,6 +107,7 @@ APScheduler `BlockingScheduler` in a daemon thread. Active jobs on `feature/sehu
 Phase 2 is implemented. `app/web/server.py` creates the FastAPI app, mounts routers, enables CORS for the development frontend, and can be started alongside `115bot.py`.
 
 Routers:
+
 - `dashboard.py` — `GET /api/dashboard/stats`, `GET /api/dashboard/trend`
 - `sehua.py` — paginated `sehua_data` list, single download, batch download, delete
 - `strategy.py` — CRUD for `crawling_strategy.yaml`, regex test endpoint
@@ -185,11 +183,13 @@ web-ui/src/
 ```
 
 Production integration:
+
 - `app/web/server.py` serves `app/web/dist/` as static files with SPA fallback when the dist dir exists.
 - `Dockerfile` uses a two-stage build: Node 20 builds `web-ui/` → dist is copied into the Python image at `/app/web/dist/`.
 - In dev, run Vite dev server (`npm run dev` in `web-ui/`) and the FastAPI backend separately; the Vite proxy forwards `/api` to `http://127.0.0.1:8000`.
 
 Dev setup:
+
 ```bash
 cd web-ui && cp .env.example .env   # VITE_API_BASE_URL=http://127.0.0.1:8000
 npm install && npm run dev          # http://localhost:5173

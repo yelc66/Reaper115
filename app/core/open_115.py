@@ -39,7 +39,11 @@ def handle_token_expiry(func):
                         # token需要刷新
                         if attempt < max_retries - 1:  # 还有重试机会
                             init.logger.info("Token需要刷新，正在重试...")
-                            self.refresh_access_token()
+                            try:
+                                self.refresh_access_token()
+                            except Exception as refresh_err:
+                                init.logger.warn(f"Token刷新失败，放弃重试: {refresh_err}")
+                                return response
                             continue
                         else:
                             init.logger.warn("Token刷新后仍然失败")
@@ -65,12 +69,8 @@ def handle_token_expiry(func):
                 return response
                 
             except Exception as e:
-                if attempt < max_retries - 1:
-                    init.logger.warn(f"API调用失败，正在重试: {e}")
-                    continue
-                else:
-                    init.logger.warn(f"API调用最终失败: {e}")
-                    raise
+                init.logger.warn(f"API调用最终失败: {e}")
+                raise
         
         return response
     return wrapper
@@ -84,6 +84,7 @@ class OpenAPI_115:
         self.lifetime_vip = False
         self.request_count = 0
         self.lock = threading.Lock()
+        self.refresh_lock = threading.Lock()
         self.last_req_time = 0
         self.file_info_cache = {}
         self.cache_hit = 0
@@ -205,56 +206,50 @@ class OpenAPI_115:
         return "", ""
 
     def refresh_access_token(self):
-        # 1. 尝试从文件加载最新Token
-        file_access_token, file_refresh_token = self._load_token_from_file()
-        
-        # 如果文件中的refresh_token与内存中的不一致，说明文件已被其他进程/线程更新
-        if file_refresh_token and file_refresh_token != self.refresh_token:
-            init.logger.info("发现本地Token文件已更新，加载新Token...")
-            self.access_token = file_access_token
-            self.refresh_token = file_refresh_token
-            return
-
-        if not self.refresh_token:
-            # 如果内存无token，且文件也无token（或文件不存在）
-            if not file_refresh_token:
-                init.logger.warn("请先进行授权，获取refresh_token！")
-                add_task_to_queue(init.bot_config['allowed_user'], "/app/images/male023.png", "请先进行授权，获取refresh_token！")
+        with self.refresh_lock:
+            # 进锁后先检查文件：若其他线程已刷新完毕，直接用新 token，不重复请求
+            file_access_token, file_refresh_token = self._load_token_from_file()
+            if file_refresh_token and file_refresh_token != self.refresh_token:
+                init.logger.info("发现本地Token文件已更新，加载新Token...")
+                self.access_token = file_access_token
+                self.refresh_token = file_refresh_token
                 return
-            # 如果内存无token但文件有
-            self.access_token = file_access_token
-            self.refresh_token = file_refresh_token
-        
-        header = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": init.USER_AGENT
-        }
-        
-        url = "https://passportapi.115.com/open/refreshToken"
-        data = {
-            "refresh_token": self.refresh_token
-        }
-        
-        try:
-            response = requests.post(url, headers=header, data=data)
-            res = response.json()
-        except Exception as e:
-            init.logger.warn(f"刷新Token请求异常: {e}")
-            raise
 
-        if response.status_code == 200 and isinstance(res, dict) and res.get('state'):
-            data = res.get('data')
-            if isinstance(data, dict) and data.get('access_token'):
-                self.access_token = data['access_token']
-                self.refresh_token = data['refresh_token']
-                self.save_token_to_file(self.access_token, self.refresh_token, init.TOKEN_FILE)
-                init.logger.info("Access token 更新成功.")
+            if not self.refresh_token:
+                if not file_refresh_token:
+                    init.logger.warn("请先进行授权，获取refresh_token！")
+                    add_task_to_queue(init.bot_config['allowed_user'], "/app/images/male023.png", "请先进行授权，获取refresh_token！")
+                    return
+                self.access_token = file_access_token
+                self.refresh_token = file_refresh_token
+
+            header = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": init.USER_AGENT
+            }
+            url = "https://passportapi.115.com/open/refreshToken"
+            data = {"refresh_token": self.refresh_token}
+
+            try:
+                response = requests.post(url, headers=header, data=data)
+                res = response.json()
+            except Exception as e:
+                init.logger.warn(f"刷新Token请求异常: {e}")
+                raise
+
+            if response.status_code == 200 and isinstance(res, dict) and res.get('state'):
+                token_data = res.get('data')
+                if isinstance(token_data, dict) and token_data.get('access_token'):
+                    self.access_token = token_data['access_token']
+                    self.refresh_token = token_data['refresh_token']
+                    self.save_token_to_file(self.access_token, self.refresh_token, init.TOKEN_FILE)
+                    init.logger.info("Access token 更新成功.")
+                else:
+                    init.logger.warn(f"Access token 更新失败: 响应数据异常 - {res}")
+                    raise Exception(f"Failed to refresh access token: invalid data format")
             else:
-                init.logger.warn(f"Access token 更新失败: 响应数据异常 - {res}")
-                raise Exception(f"Failed to refresh access token: invalid data format")
-        else:
-            init.logger.warn(f"Access token 更新失败: {res}")
-            raise Exception(f"Failed to refresh access token: {res.get('message', 'unknown error')}")
+                init.logger.warn(f"Access token 更新失败: {res}")
+                raise Exception(f"Failed to refresh access token: {res.get('message', 'unknown error')}")
         
 
     def _get_headers(self):

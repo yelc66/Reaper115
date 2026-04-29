@@ -13,7 +13,6 @@ import init
 
 from app.utils.message_queue import add_task_to_queue, queue_worker
 from app.handlers.download_handler import register_download_handlers
-from app.handlers.sync_handler import register_sync_handlers
 from app.handlers.video_handler import register_video_handlers
 from app.core.scheduler import start_scheduler_in_thread
 from app.handlers.offline_task_handler import register_offline_task_handlers
@@ -42,7 +41,6 @@ def get_help_info():
 <u>磁力/离线下载：</u>
 • 直接输入下载链接，支持磁力/ed2k/迅雷
 • 离线超时可选择添加到重试列表
-• 根据配置自动生成 <code>.strm</code> 软链文件\n
 <u>重试列表：</u>
 • 输入 <code>"/rl"</code>
 • 查看当前重试列表，可根据需要选择是否清空\n
@@ -51,7 +49,7 @@ def get_help_info():
 • 基于版块配置，爬取涩花数据，留空则爬取昨日\n
 <u>目录同步：</u>
 • 输入 <code>"/sync"</code>
-• 选择目录后会在对应的目录创建strm软链\n
+• 选择目录后查看其中视频文件列表\n
 <u>视频转存：</u>
 • 直接转发视频给机器人，选择保存目录即可保存到115
 """
@@ -193,8 +191,6 @@ if __name__ == '__main__':
     register_offline_task_handlers(application)
     # 手动爬虫
     register_crawl_handlers(application)
-    # 注册同步
-    register_sync_handlers(application)
     # 注册视频
     register_video_handlers(application)
     

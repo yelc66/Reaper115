@@ -75,9 +75,8 @@ Imagine this scenario:
 While commuting, you come across an interesting movie. Simply send the magnet link to the TG bot, and it will:
 - Automatically download the movie to the specified category directory in 115 Network Disk
 - Intelligently clean up advertisement files
-- Automatically create STRM files and notify Emby for media library scanning
 
-When you return home after work, just prepare some snacks and drinks, open Emby, and enjoy a well-organized viewing experience. Let a good movie wash away your daily fatigue and help you relax.
+When you return home after work, just open 115 and enjoy a well-organized collection.
 
 ## Known Issues
 - Limited support for TV series. Downloading series directly may cause unexpected issues
@@ -95,7 +94,6 @@ If you'd like to help improve this project, welcome to [join](https://t.me/qiqia
   - Support multiple download protocols: Magnet links, Thunder, ed2k, FTP, HTTPS
   - Intelligent automatic category storage
   - Advertisement file cleanup
-  - Automatic STRM file creation
 
 - 🎬 **AV Number Download**
   - Input AV number to automatically download offline
@@ -105,12 +103,9 @@ If you'd like to help improve this project, welcome to [join](https://t.me/qiqia
   - Support automatic movie resource subscription
   - Automatic offline download when new resources are available
   - Intelligent advertisement file cleanup
-  - Automatic STRM file creation
 
 - 🔄 **Directory Synchronization**
-  - Automatic local symlink creation
-  - STRM file batch generation
-  - Seamless Emby media library integration
+  - Automatic local directory sync
 
 - � **Video Processing**
   - Support automatic video file upload to 115 Network Disk (Note: Consumes VPS/proxy traffic, use with caution)
@@ -177,8 +172,6 @@ Before starting, fill at least these values in `config/config.yaml`:
      -e TZ=Asia/Shanghai \
      -v /path/to/config:/config \
      -v /path/to/tmp:/tmp \
-     -v /path/to/media:/media \
-     -v /path/to/CloudNAS:/CloudNAS:rslave \
      115bot:latest
    ```
    
@@ -196,8 +189,6 @@ Before starting, fill at least these values in `config/config.yaml`:
       volumes:
         - /path/to/config:/config  # Configuration path
         - /path/to/tmp:/tmp        # Temp path
-        - /path/to/media:/media    # Emby media library directory (symlink directory)
-        - /path/to/CloudNAS:/CloudNAS:rslave # CloudDrive2 mount directory
    ```
 
 ## Configuration
@@ -232,14 +223,11 @@ Please refer to the comments in `config/config.yaml.example` for configuration d
 
 ### Basic Commands
 
-- `/start`   - Show help information
-- `/auth`    - 115 authorization setup
-- `/reload`  - reload the configuration
-- `/rl`      - Retry list
-- `/av`      - AV number download
-- `/sync`    - Sync directory and create symlinks
-- `/sm`      - Subscribe to movies
-- `/q`       - Cancel current session
+- `/start`      - Show help information
+- `/reload`     - Reload the configuration
+- `/rl`         - Retry list
+- `/csh [date]` - Manually trigger sehua crawl
+- `/sync`       - Sync directory
 
 ### 115 Open Platform Application
 

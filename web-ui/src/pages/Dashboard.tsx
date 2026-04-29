@@ -6,21 +6,21 @@ import { dashboardApi } from "../api/queries";
 import { Badge, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
 import { errorMessage, formatDateTime, formatNumber } from "../lib/utils";
 
-const palette = ["#5E6AD2", "#4DAA81", "#E8C547", "#E06C75", "#9B86E8", "#38BDF8", "#6B7280"];
+const CHART_PALETTE = ["#5E6AD2", "#4DAA81", "#E8C547", "#E06C75", "#9B86E8", "#38BDF8", "#6B7280"];
 
 export function Dashboard() {
-  const stats = useQuery({ queryKey: ["dashboard", "stats"], queryFn: dashboardApi.stats });
-  const trend = useQuery({ queryKey: ["dashboard", "trend", 30], queryFn: () => dashboardApi.trend(30) });
+  const statsQuery = useQuery({ queryKey: ["dashboard", "stats"], queryFn: dashboardApi.stats });
+  const trendQuery = useQuery({ queryKey: ["dashboard", "trend", 30], queryFn: () => dashboardApi.trend(30) });
 
-  if (stats.isPending || trend.isPending) return <LoadingState />;
-  if (stats.isError) return <ErrorState message={errorMessage(stats.error)} />;
-  if (trend.isError) return <ErrorState message={errorMessage(trend.error)} />;
+  if (statsQuery.isPending || trendQuery.isPending) return <LoadingState />;
+  if (statsQuery.isError) return <ErrorState message={errorMessage(statsQuery.error)} />;
+  if (trendQuery.isError) return <ErrorState message={errorMessage(trendQuery.error)} />;
 
   const cards = [
-    { label: "资源总数", value: stats.data.total, icon: BarChart3, tone: "text-primary" },
-    { label: "已离线", value: stats.data.downloaded, icon: CheckCircle2, tone: "text-emerald-400" },
-    { label: "待处理", value: stats.data.pending, icon: Clock3, tone: "text-amber-400" },
-    { label: "重试队列", value: stats.data.retry_pending, icon: RotateCcw, tone: "text-rose-400" },
+    { label: "资源总数", value: statsQuery.data.total, icon: BarChart3, tone: "text-primary" },
+    { label: "已离线", value: statsQuery.data.downloaded, icon: CheckCircle2, tone: "text-emerald-400" },
+    { label: "待处理", value: statsQuery.data.pending, icon: Clock3, tone: "text-amber-400" },
+    { label: "重试队列", value: statsQuery.data.retryPending, icon: RotateCcw, tone: "text-rose-400" },
   ];
 
   return (
@@ -44,7 +44,7 @@ export function Dashboard() {
           <h2 className="mb-4 text-base font-semibold">30 日趋势</h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trend.data.items}>
+              <LineChart data={trendQuery.data.items}>
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
                 <Tooltip />
@@ -59,9 +59,16 @@ export function Dashboard() {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={stats.data.by_section} dataKey="total" nameKey="section_name" innerRadius={60} outerRadius={105} paddingAngle={2}>
-                  {stats.data.by_section.map((_, index) => (
-                    <Cell key={index} fill={palette[index % palette.length]} />
+                <Pie
+                  data={statsQuery.data.bySection}
+                  dataKey="total"
+                  nameKey="sectionName"
+                  innerRadius={60}
+                  outerRadius={105}
+                  paddingAngle={2}
+                >
+                  {statsQuery.data.bySection.map((section, index) => (
+                    <Cell key={section.sectionName} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -83,14 +90,16 @@ export function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {stats.data.recent.map((item) => (
+              {statsQuery.data.recent.map((item) => (
                 <tr key={item.id}>
                   <td className="max-w-xl py-3 pr-4">{item.title}</td>
-                  <td className="py-3 pr-4">{item.section_name}</td>
+                  <td className="py-3 pr-4">{item.sectionName}</td>
                   <td className="py-3 pr-4">
-                    <Badge tone={item.is_download ? "success" : "warning"}>{item.is_download ? "已离线" : "待处理"}</Badge>
+                    <Badge tone={item.isDownload ? "success" : "warning"}>
+                      {item.isDownload ? "已离线" : "待处理"}
+                    </Badge>
                   </td>
-                  <td className="py-3 pr-4 text-muted-foreground">{formatDateTime(item.created_at)}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">{formatDateTime(item.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

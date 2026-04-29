@@ -36,11 +36,241 @@ def _build_full_url(path: str):
         base = f"https://{base}"
     return f"{base}/{path.lstrip('/')}"
 
+
+def _parse_topic_date(value):
+    if not value:
+        return None
+    raw = str(value).strip()
+    today = datetime.datetime.now().date()
+
+    match = re.search(r"(\d{4}-\d{1,2}-\d{1,2})", raw)
+    if match:
+        try:
+            return datetime.datetime.strptime(match.group(1), "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    if any(keyword in raw for keyword in ("刚刚", "秒前", "分钟前", "小时前", "小时", "半小时前", "今天")):
+        return today
+
+    if "昨天" in raw:
+        return today - datetime.timedelta(days=1)
+
+    if "前天" in raw:
+        return today - datetime.timedelta(days=2)
+
+    match = re.search(r"(\d+)\s*天前", raw)
+    if match:
+        return today - datetime.timedelta(days=int(match.group(1)))
+
+    try:
+        return datetime.datetime.strptime(raw[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_topic_age_days(value):
+    if not value:
+        return None
+    raw = str(value).strip()
+    today = datetime.datetime.now().date()
+
+    if any(keyword in raw for keyword in ("刚刚", "秒前", "分钟前", "小时前", "小时", "半小时前", "今天")):
+        return 0
+
+    if "昨天" in raw:
+        return 1
+
+    if "前天" in raw:
+        return 2
+
+    match = re.search(r"(\d+)\s*天前", raw)
+    if match:
+        return int(match.group(1))
+
+    parsed_date = _parse_topic_date(raw)
+    if parsed_date:
+        return (today - parsed_date).days
+
+    return None
+
+
+def _normalize_crawl_mode(mode_or_date, end_date=None):
+    raw = str(mode_or_date or "").strip().lower()
+    if raw in ("today", "今天"):
+        return "today"
+    if raw in ("yesterday", "昨天"):
+        return "yesterday"
+    if raw in ("7days", "seven_days", "week", "七天", "近7天", "近 7 天"):
+        return "7days"
+
+    start, end = _normalize_date_range(mode_or_date, end_date)
+    today = datetime.datetime.now().date()
+    if start and end:
+        if start == today and end == today:
+            return "today"
+        if start == today - datetime.timedelta(days=1) and end == today - datetime.timedelta(days=1):
+            return "yesterday"
+        if start == today - datetime.timedelta(days=7) and end == today:
+            return "7days"
+
+    return raw or "yesterday"
+
+
+def _format_crawl_mode(mode):
+    mode = _normalize_crawl_mode(mode)
+    return {
+        "today": "今天",
+        "yesterday": "昨天",
+        "7days": "七天",
+    }.get(mode, mode)
+
+
+def _topic_matches_crawl_mode(topic_date_text, mode):
+    age_days = _parse_topic_age_days(topic_date_text)
+    if age_days is None or age_days < 0:
+        return False
+    mode = _normalize_crawl_mode(mode)
+    if mode == "today":
+        return age_days == 0
+    if mode == "yesterday":
+        return age_days == 1
+    if mode == "7days":
+        return age_days <= 7
+    target_date = _parse_topic_date(mode)
+    topic_date = _parse_topic_date(topic_date_text)
+    if target_date and topic_date:
+        return topic_date == target_date
+    return False
+
+
+def _page_is_older_than_crawl_mode(found_dates, mode):
+    page_ages = [_parse_topic_age_days(item) for item in found_dates]
+    page_ages = [item for item in page_ages if item is not None]
+    if not page_ages:
+        return False, None
+
+    newest_age = min(page_ages)
+    mode = _normalize_crawl_mode(mode)
+    max_age = {"today": 0, "yesterday": 1, "7days": 7}.get(mode)
+    if max_age is None:
+        target_date = _parse_topic_date(mode)
+        if not target_date:
+            return False, newest_age
+        target_age = (datetime.datetime.now().date() - target_date).days
+        return newest_age > target_age, newest_age
+    return newest_age > max_age, newest_age
+
+
+def _format_topic_date(value):
+    parsed = _parse_topic_date(value)
+    return parsed.strftime("%Y-%m-%d") if parsed else None
+
+
+def _normalize_date_range(start_date, end_date=None):
+    start = _parse_topic_date(start_date)
+    end = _parse_topic_date(end_date or start_date)
+    if not start or not end:
+        return None, None
+    if start > end:
+        start, end = end, start
+    return start, end
+
+
+def _format_date_range(start_date, end_date=None):
+    start, end = _normalize_date_range(start_date, end_date)
+    if not start or not end:
+        return str(start_date)
+    if start == end:
+        return start.strftime("%Y-%m-%d")
+    return f"{start.strftime('%Y-%m-%d')} 至 {end.strftime('%Y-%m-%d')}"
+
 def get_base_url():
-    base_url = init.bot_config.get('sehua_spider', {}).get('base_url', "www.sehuatang.net")
+    base_url = init.bot_config.get('sehuatang_spider', {}).get('base_url', "www.sehuatang.net")
     if not base_url:
         base_url = "www.sehuatang.net"
     return base_url
+
+
+def _parse_cookie_string(cookie_string):
+    cookies = []
+    if not cookie_string:
+        return cookies
+    for item in cookie_string.split(';'):
+        item = item.strip()
+        if not item or '=' not in item:
+            continue
+        name, value = item.split('=', 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append({
+            'name': name,
+            'value': value.strip(),
+            'path': '/'
+        })
+    return cookies
+
+
+def _normalize_cookie(cookie):
+    if not isinstance(cookie, dict):
+        return None
+    name = str(cookie.get('name', '')).strip()
+    value = cookie.get('value')
+    if not name or value is None:
+        return None
+
+    normalized = {
+        'name': name,
+        'value': str(value),
+        'path': cookie.get('path') or '/'
+    }
+    for key in ('domain', 'secure', 'httpOnly', 'sameSite'):
+        if key in cookie and cookie.get(key) not in (None, ''):
+            normalized[key] = cookie.get(key)
+    if cookie.get('expiry') not in (None, ''):
+        try:
+            normalized['expiry'] = int(cookie.get('expiry'))
+        except (TypeError, ValueError):
+            pass
+    return normalized
+
+
+def _get_configured_cookies():
+    sehua_config = init.bot_config.get('sehuatang_spider', {}) or {}
+    cookies = []
+    cookies.extend(_parse_cookie_string(sehua_config.get('cookie_string', '')))
+    for cookie in sehua_config.get('cookies', []) or []:
+        normalized = _normalize_cookie(cookie)
+        if normalized:
+            cookies.append(normalized)
+    return cookies
+
+
+async def apply_configured_cookies():
+    cookies = _get_configured_cookies()
+    if not cookies:
+        return
+    if not browser or not browser.driver:
+        init.logger.warn("涩花 Cookie 注入跳过：浏览器未初始化")
+        return
+
+    def _add_cookies(driver):
+        success_count = 0
+        for cookie in cookies:
+            try:
+                driver.add_cookie(cookie)
+                success_count += 1
+            except Exception as e:
+                init.logger.debug(f"涩花 Cookie 写入失败 [{cookie.get('name')}]: {e}")
+        if success_count:
+            init.logger.info(f"涩花 Cookie 写入完成: {success_count}/{len(cookies)}，刷新页面...")
+            driver.refresh()
+            time.sleep(2)
+        else:
+            init.logger.warn("涩花 Cookie 配置存在，但没有成功写入，请检查 cookie domain 是否匹配 base_url")
+
+    await browser.run_with_driver(_add_cookies)
 
 
 async def download_image(image_url, save_path):
@@ -152,26 +382,28 @@ def get_section_id(section_name):
     return section_map.get(section_name, 0)
 
 
-async def sehua_spider_start_async():
+async def sehuatang_spider_start_async():
     """完整的爬虫启动函数，包含浏览器生命周期管理"""
     global browser
-    if not init.bot_config.get('sehua_spider', {}).get('enable', False):
+    if not init.bot_config.get('sehuatang_spider', {}).get('enable', False):
         return
     # 初始化全局浏览器
     browser = SeleniumBrowser(get_base_url())
-    
+
     try:
         await browser.init_browser()
-        
+
         if not browser.driver:
             add_task_to_queue(init.bot_config['allowed_user'], None, f"❌ 浏览器初始化失败！")
             return
-            
+
+        await apply_configured_cookies()
+
         # 尝试通过 Cloudflare 验证
         await browser.pass_cloudflare_check()
         yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
         date = yesterday.strftime("%Y-%m-%d")
-        sections = init.bot_config['sehua_spider'].get('sections', [])
+        sections = init.bot_config['sehuatang_spider'].get('sections', [])
         for section in sections:
             section_name = section.get('name')
             init.logger.info(f"开始爬取 {section_name} 分区...")
@@ -189,35 +421,38 @@ async def sehua_spider_start_async():
         
     # 离线到115 (Sync)
     init.logger.info("开始执行涩花离线任务...")
-    sehua_offline()
+    sehua_offline(date)
 
-def sehua_spider_start():
+def sehuatang_spider_start():
     try:
-        asyncio.run(sehua_spider_start_async())
+        asyncio.run(sehuatang_spider_start_async())
     except Exception as e:
         init.logger.error(f"涩花爬虫启动失败: {e}")
         
         
-async def sehua_spider_by_date_async(date):
+async def sehuatang_spider_by_date_async(date, end_date=None):
     """完整的爬虫启动函数，包含浏览器生命周期管理"""
     global browser
     browser = SeleniumBrowser(get_base_url())
-    
+    crawl_mode = _normalize_crawl_mode(date, end_date)
+    date_label = _format_crawl_mode(crawl_mode)
+
     try:
         await browser.init_browser()
         # 初始化全局浏览器
         if not browser.driver:
             add_task_to_queue(init.bot_config['allowed_user'], None, f"❌ 浏览器初始化失败！")
-            init.CRAWL_SEHUA_STATUS = 0
             return
-            
+
+        await apply_configured_cookies()
+
         # 尝试通过 Cloudflare 验证
         await browser.pass_cloudflare_check()
-        sections = init.bot_config['sehua_spider'].get('sections', [])
+        sections = init.bot_config['sehuatang_spider'].get('sections', [])
         for section in sections:
             section_name = section.get('name')
             init.logger.info(f"开始爬取 {section_name} 分区...")
-            await section_spider(section_name, date)
+            await section_spider(section_name, crawl_mode)
             init.logger.info(f"{section_name} 分区爬取完成")
             delay = random.uniform(5, 10)
             await asyncio.sleep(delay)
@@ -228,25 +463,31 @@ async def sehua_spider_by_date_async(date):
     finally:
         # 关闭全局浏览器
         await browser.close()
-    # 离线到115 (Sync)
-    init.logger.info("开始执行涩花离线任务...")
-    sehua_offline()
-    init.CRAWL_SEHUA_STATUS = 0
+        try:
+            # 离线到115 (Sync)
+            init.logger.info("开始执行涩花离线任务...")
+            sehua_offline(date_label)
+        except Exception as e:
+            init.logger.error(f"涩花离线任务执行失败: {e}")
+        finally:
+            init.CRAWL_SEHUA_STATUS = 0
 
-def sehua_spider_by_date(date):
+def sehuatang_spider_by_date(date, end_date=None):
     try:
-        asyncio.run(sehua_spider_by_date_async(date))
+        asyncio.run(sehuatang_spider_by_date_async(date, end_date))
     except Exception as e:
         init.logger.error(f"涩花爬虫(按日期)启动失败: {e}")
         init.CRAWL_SEHUA_STATUS = 0
     
     
-async def section_spider(section_name, date):
+async def section_spider(section_name, date, end_date=None):
+    crawl_mode = _normalize_crawl_mode(date, end_date)
+    date_label = _format_crawl_mode(crawl_mode)
     
-    update_list = await get_section_update(section_name, date)
+    update_list = await get_section_update(section_name, crawl_mode)
     
     if not update_list:
-        init.logger.info(f"没有找到 {section_name} 在 {date} 的更新内容")
+        init.logger.info(f"没有找到 {section_name} 在 {date_label} 的更新内容")
         return
     
     successful_count = 0
@@ -256,7 +497,13 @@ async def section_spider(section_name, date):
 
     try:
         for i, topic in enumerate(update_list):
-            url = _build_full_url(topic)
+            if isinstance(topic, dict):
+                topic_path = topic.get('url')
+                topic_date = topic.get('date') or date
+            else:
+                topic_path = topic
+                topic_date = date
+            url = _build_full_url(topic_path)
             init.logger.debug(f"正在处理第 {i+1}/{len(update_list)} 个话题: {url}")
             
             success = False
@@ -288,7 +535,7 @@ async def section_spider(section_name, date):
                     
                     html = await browser.get_page_source()
                     if html and len(html) > 1000:  # 确保获取到完整页面
-                        result = await parse_topic(section_name, html, url, date)
+                        result = await parse_topic(section_name, html, url, topic_date)
                         if result and result.get('title'):
                             init.logger.debug(f"成功解析: {result.get('title', 'Unknown')}")
                             results.append(result)
@@ -415,14 +662,19 @@ async def parse_topic(section_name, html, url, date):
     return result
 
 
-async def get_section_update(section_name, date):
+async def get_section_update(section_name, date, end_date=None):
     all_data_today = []
     section_id = get_section_id(section_name)
     if section_id == 0:
         return all_data_today
+
+    crawl_mode = _normalize_crawl_mode(date, end_date)
+    date_label = _format_crawl_mode(crawl_mode)
+
+    max_pages = init.bot_config.get('sehuatang_spider', {}).get('max_pages', 50)
     
     try:
-        for page_num in range(1, 10):
+        for page_num in range(1, max_pages + 1):
             url = _build_full_url(f"forum.php?mod=forumdisplay&fid={section_id}&page={page_num}")
             init.logger.info(f"正在获取 {section_name} 第 {page_num} 页...")
             
@@ -449,15 +701,25 @@ async def get_section_update(section_name, date):
                     if html and len(html) > 1000:
                         # 验证页面是否包含预期的内容结构
                         if 'normalthread_' in html or 'postlist' in html:
-                            topics = parse_section_page(html, date, page_num, section_name)
+                            topics, found_dates = parse_section_page(html, crawl_mode, page_num, section_name)
                             if topics:
-                                init.logger.info(f"其中 {len(topics)} 个今日话题")
+                                init.logger.info(f"其中 {len(topics)} 个目标时间范围话题")
                                 all_data_today.extend(topics)
                                 success = True
                                 break
-                            else:
-                                init.logger.info(f"  第 {page_num} 页没有今日更新，停止翻页")
+
+                            if not found_dates:
+                                init.logger.info(f"  第 {page_num} 页没有解析到帖子时间，停止翻页")
                                 return all_data_today
+
+                            page_is_older, newest_age = _page_is_older_than_crawl_mode(found_dates, crawl_mode)
+                            if page_is_older:
+                                init.logger.info(f"  第 {page_num} 页最新帖子已是 {newest_age} 天前，早于目标时间范围 {date_label}，停止翻页")
+                                return all_data_today
+
+                            success = True
+                            init.logger.info(f"  第 {page_num} 页包含目标时间范围但无匹配标题，继续翻页")
+                            break
                         else:
                             init.logger.warn(f"  页面结构异常，可能仍在加载中")
                             await browser.pass_cloudflare_check()
@@ -478,22 +740,26 @@ async def get_section_update(section_name, date):
                 
     except Exception as e:
         init.logger.warn(f"获取列表页面时发生错误: {str(e)}")
-    init.logger.info(f"总共找到 {len(all_data_today)} 个今日话题")
+    init.logger.info(f"总共找到 {len(all_data_today)} 个目标时间范围话题")
     return all_data_today
 
 
-def parse_section_page(html_content, date, page_num, section_name):
+def parse_section_page(html_content, date, page_num, section_name, end_date=None):
     topics = []
     soup = BeautifulSoup(html_content, "html.parser")
+    crawl_mode = _normalize_crawl_mode(date, end_date)
+    date_label = _format_crawl_mode(crawl_mode)
     
     # 调试信息
-    init.logger.debug(f"正在解析日期为 {date} 的帖子...")
+    init.logger.debug(f"正在解析时间范围为 {date_label} 的帖子...")
     
     # 查找所有线程
     threads = soup.find_all('tbody', id=lambda x: x and x.startswith('normalthread_'))
     init.logger.info(f"第 {page_num} 页，找到 {len(threads)} 个帖子")
 
     found_dates = []  # 用于调试，收集找到的所有日期
+    date_match_count = 0
+    strategy_skip_samples = []
     
     for i, thread in enumerate(threads):
         # 提取日期（从td.by下的em内的span的title属性）
@@ -508,18 +774,26 @@ def parse_section_page(html_content, date, page_num, section_name):
                 date_span = em_tag.find('span', title=True)
                 if date_span:
                     topic_date = date_span.get('title')
+                else:
+                    topic_date = em_tag.get_text(" ", strip=True)
+                if topic_date:
                     found_dates.append(topic_date)
         
         # 提取标题用于调试
         title_link = thread.find('a', class_='s xst')
         title = title_link.text.strip() if title_link else "无标题"
         
-        if not topic_date or topic_date != date:
-            continue  # 跳过非当日的帖子
+        parsed_topic_date = _parse_topic_date(topic_date)
+        normalized_topic_date = _format_topic_date(topic_date)
+        if not parsed_topic_date or not _topic_matches_crawl_mode(topic_date, crawl_mode):
+            continue  # 跳过目标时间范围外的帖子
+        date_match_count += 1
             
         # 提前过滤标题
         if not is_title_allowed(section_name, title):
             init.logger.debug(f"标题[{title}]不满足[{section_name}]板块的规则，跳过!")
+            if len(strategy_skip_samples) < 3:
+                strategy_skip_samples.append(title)
             continue
               
         # 提取链接（从标题的a标签的href属性）
@@ -527,16 +801,20 @@ def parse_section_page(html_content, date, page_num, section_name):
         if '-' in link:
             topic_id = link.split('-')[1]
             topic_link = f"forum.php?mod=viewthread&tid={topic_id}&extra=page%3D1"
-            topics.append(topic_link)
-            init.logger.info(f"找到今日帖子: {title}...")
+            topics.append({"url": topic_link, "date": normalized_topic_date})
+            init.logger.info(f"找到目标时间范围帖子: {title}...")
     
     # 调试信息：显示找到的所有唯一日期
     unique_dates = list(set(found_dates))
     init.logger.debug(f"  页面中找到的日期: {unique_dates}")
-    init.logger.debug(f"  目标日期: {date}")
-    init.logger.debug(f"  匹配的今日帖子数量: {len(topics)}")
+    init.logger.debug(f"  目标时间范围: {date_label}")
+    init.logger.debug(f"  匹配的目标时间范围帖子数量: {len(topics)}")
+    if date_match_count and not topics:
+        init.logger.info(f"  第 {page_num} 页日期命中 {date_match_count} 个，但策略命中 0 个")
+        for sample in strategy_skip_samples:
+            init.logger.info(f"  策略跳过示例: {sample}")
     
-    return topics
+    return topics, found_dates
 
 
 async def age_check():
@@ -792,15 +1070,14 @@ def match_strategy(result):
                     specify_path = item.get('specify_save_path') or result.get('save_path')
                     return True, specify_path
         
-        # 有配置规则但都不匹配（理论上不应发生，因为已提前过滤），回退到默认路径
-        return True, result.get('save_path')
+        return False, None
         
     # 空的配置等同于无效策略，默认全部通过
     return True, result.get('save_path')
 
 
 def get_sehua_save_path(_section_name):
-    sections = init.bot_config.get('sehua_spider', {}).get('sections', [])
+    sections = init.bot_config.get('sehuatang_spider', {}).get('sections', [])
     for section in sections:
         section_name = section.get('name', '')
         if section_name == _section_name:
@@ -812,4 +1089,4 @@ if __name__ == "__main__":
     init.load_yaml_config()
     init.create_logger()
     init.init_db()
-    sehua_spider_by_date("2025-09-25")
+    sehuatang_spider_by_date("2025-09-25")

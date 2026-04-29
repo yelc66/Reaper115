@@ -19,7 +19,7 @@ export default {
         "surface-elevated": "hsl(var(--surface-elevated))",
       },
       boxShadow: {
-        panel: "0 0 0 1px rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.4)",
+        panel: "0 0 0 1px hsl(var(--border)), 0 2px 8px rgba(0,0,0,0.12)",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],

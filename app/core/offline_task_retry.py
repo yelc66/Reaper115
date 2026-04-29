@@ -3,8 +3,6 @@ import init
 import time
 import os
 import asyncio
-import shutil
-from pathlib import Path
 from datetime import datetime
 from app.utils.sqlitelib import *
 from app.utils.message_queue import add_task_to_queue
@@ -46,10 +44,10 @@ def offline_task_retry():
     sehua_offline()
 
 
-def sehua_offline():
+def sehua_offline(date=None):
     save_path_list = []
     check_results = []
-    sections = init.bot_config.get('sehua_spider', {}).get('sections', [])
+    sections = init.bot_config.get('sehuatang_spider', {}).get('sections', [])
     for section in sections:
         section_name = section.get('name', '')
         save_path = section.get('save_path', f'/AV/涩花/{section_name}')
@@ -64,7 +62,7 @@ def sehua_offline():
             offline_groups = create_offline_group_by_save_path(results)
             if offline_groups:
                 for save_path, batches in offline_groups.items():
-                    save_path = add_year_month_to_path(init.bot_config.get('sehua_spider', {}).get('sort_by_year_month', False), save_path)
+                    save_path = add_year_month_to_path(init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False), save_path)
                     if save_path not in save_path_list:
                         save_path_list.append(save_path)
                     for batch_tasks in batches:
@@ -74,6 +72,13 @@ def sehua_offline():
                 init.logger.warn("涩花离线任务未执行，可能是115离线配额不足，请检查115账号状态！")
                 add_task_to_queue(init.bot_config['allowed_user'], f"{init.IMAGE_PATH}/male023.png", "涩花离线任务未执行，可能是115离线配额不足，请检查115账号状态！")
                 return
+
+    if not check_results:
+        date_text = f"，日期: {date}" if date else ""
+        message = escape_markdown(f"✅ 涩花爬取完成{date_text}，没有找到更新内容或待离线任务。", version=2)
+        init.logger.info(f"涩花离线任务完成{date_text}，没有找到更新内容或待离线任务。")
+        add_task_to_queue(init.bot_config['allowed_user'], None, message)
+        return
 
     time.sleep(300)
     domestic_original_count = 0
@@ -102,7 +107,7 @@ def sehua_offline():
             asia_uncensored_count += 1
         elif section_name == '高清中文字幕':
             hd_subtitle_count += 1
-        save_path = add_year_month_to_path(init.bot_config.get('sehua_spider', {}).get('sort_by_year_month', False), item['save_path'])
+        save_path = add_year_month_to_path(init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False), item['save_path'])
         for task in offline_task_status:
             if task['url'] == magnet:
                 if task['status'] == 2 and task['percentDone'] == 100:
@@ -151,12 +156,9 @@ def sehua_offline():
             add_task_to_queue(init.bot_config['allowed_user'], f"{init.IMAGE_PATH}/sehua_daily_update.png", final_message)
         else:
             add_task_to_queue(init.bot_config['allowed_user'], f"{init.IMAGE_PATH}/teacher_pto.jpg", final_message)
-            return
 
     for path in save_path_list:
         init.openapi_115.auto_clean_all(path)
-        result = init.openapi_115.find_all_voideos(path, success_task, time_stamp)
-        generate_strm_file(result)
 
     init.openapi_115.clear_cloud_task()
 
@@ -204,7 +206,7 @@ def sehua_success_proccesser(item, save_path, task, success_list):
     elif section_name == '高清中文字幕':
         success_list[3] += 1
 
-    if init.bot_config.get('sehua_spider', {}).get('notify_me', False):
+    if init.bot_config.get('sehuatang_spider', {}).get('notify_me', False):
         msg_av_number = escape_markdown(f"#{av_number}", version=2)
         msg_title = escape_markdown(title, version=2)
         msg_date = escape_markdown(publish_date, version=2)
@@ -296,48 +298,6 @@ def create_offline_group_by_save_path(res_list):
 
     return result
 
-
-def generate_strm_file(result):
-    strm_mode = init.bot_config.get('strm_mode', 'disable')
-    if strm_mode == 'disable':
-        return
-
-    strm_root = init.bot_config.get('strm_root', '/media/115')
-    mount_root = init.bot_config.get('mount_root', '/CloudNAS/115')
-    openlist_root = init.bot_config.get('openlist_root', '/115')
-
-    for item in result:
-        try:
-            save_path = item['save_path']
-            folder_name = item['folder_name']
-            file_name = item['file_name']
-            image_path = item['image_path']
-
-            relative_save_path = save_path.lstrip('/')
-            strm_file_name = f"{Path(file_name).stem}.strm"
-            strm_file_path = Path(strm_root) / relative_save_path / folder_name / strm_file_name
-            strm_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            if image_path and os.path.exists(image_path):
-                poster_path = Path(image_path)
-                image_suffix = poster_path.suffix.lower()
-                if image_suffix:
-                    if image_suffix in ['.jpg', '.jpeg', '.png']:
-                        shutil.copy2(image_path, strm_file_path.parent / f"poster{image_suffix}")
-                    else:
-                        shutil.copy2(image_path, strm_file_path.parent / "poster.jpg")
-
-            if strm_mode == "strm_local":
-                real_path = os.path.normpath(f"{mount_root}/{save_path}/{folder_name}/{file_name}")
-            else:
-                real_path = os.path.normpath(f"{openlist_root}/{save_path}/{folder_name}/{file_name}")
-
-            with open(strm_file_path, 'w', encoding='utf-8') as f:
-                f.write(real_path)
-            init.logger.info(f"已创建STRM文件: {strm_file_path}，内容: {real_path}")
-
-        except Exception as e:
-            init.logger.error(f"创建STRM文件失败 [{item.get('file_name', '')}]: {e}")
 
 
 def add_year_month_to_path(need_add, original_path):

@@ -2,20 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Linear-inspired dark design system */
-:root {
-  --background: 0 0% 10%;           /* #1A1A1A — page bg */
-  --surface: 0 0% 14%;              /* #242424 — card / panel */
-  --surface-elevated: 0 0% 18%;     /* #2E2E2E — hover / elevated */
-  --border: 0 0% 21%;               /* #363636 — subtle borders */
-  --muted: 0 0% 18%;                /* #2E2E2E — muted bg */
-  --muted-foreground: 0 0% 56%;     /* #8F8F8F — secondary text */
-  --foreground: 0 0% 95%;           /* #F2F2F2 — primary text */
-  --primary: 234 56% 60%;           /* #5E6AD2 — Linear purple */
+/* Dark theme (default) */
+:root,
+[data-theme="dark"] {
+  --background: 224 32% 9%;
+  --surface: 226 28% 13%;
+  --surface-elevated: 226 26% 17%;
+  --border: 225 22% 22%;
+  --muted: 226 26% 17%;
+  --muted-foreground: 220 18% 56%;
+  --foreground: 216 32% 94%;
+  --primary: 234 80% 68%;
   --primary-foreground: 0 0% 100%;
-  --destructive: 0 55% 56%;         /* #CF4B4B */
-  --success: 158 42% 44%;           /* #3D9970 */
-  --warning: 38 90% 50%;            /* #F2A900 */
+  --destructive: 0 65% 60%;
+  --success: 158 52% 48%;
+  --warning: 38 92% 54%;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --background: 220 24% 97%;
+  --surface: 0 0% 100%;
+  --surface-elevated: 220 20% 94%;
+  --border: 220 16% 88%;
+  --muted: 220 20% 94%;
+  --muted-foreground: 220 12% 48%;
+  --foreground: 224 28% 14%;
+  --primary: 234 72% 58%;
+  --primary-foreground: 0 0% 100%;
+  --destructive: 0 68% 52%;
+  --success: 158 56% 38%;
+  --warning: 38 92% 44%;
 }
 
 * {

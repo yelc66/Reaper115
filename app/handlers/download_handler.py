@@ -11,7 +11,6 @@ import time
 from pathlib import Path
 from app.utils.message_queue import add_task_to_queue
 from app.utils.ai import get_movie_tmdb_name_with_ai
-from app.utils.media_utils import create_strm_file, notice_emby_scan_library
 from enum import Enum
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -410,17 +409,8 @@ async def handle_manual_rename(update: Update, context: ContextTypes.DEFAULT_TYP
         
         # 构建新的路径
         new_final_path = f"{selected_path}/{new_resource_name}"
-        
-        # 获取文件列表并创建STRM文件
-        file_list = init.openapi_115.get_files_from_dir(new_final_path)
-        create_strm_file(new_final_path, file_list)
-        
-        # 通知Emby扫库
-        is_noticed = notice_emby_scan_library(new_final_path)
-        if is_noticed:
-            message = f"✅ 重命名成功：`{new_resource_name}`\n\n**👻 已通知Emby扫库，请稍后确认！**"
-        else:
-            message = f"✅ 重命名成功：`{new_resource_name}`\n\n**⚠️ 未能通知Emby，请先配置'EMBY API KEY'！**"
+
+        message = f"✅ 重命名成功：`{new_resource_name}`"
         try:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,

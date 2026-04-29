@@ -6,17 +6,17 @@
 
 ## 项目目标
 
-从 Telegram-115bot 分支出 `feature/sehua-web`，专注涩花资源的**自动抓取 → 策略过滤 → 离线入 115 → 广告清理**，并提供 Web 管理界面，保留精简版 TG Bot 通知。
+从 Telegram-115bot 分支出 `feature/sehua-web`，专注涩花资源的**自动抓取 → 策略过滤 → 离线入 115 → 广告清理**，并提供 Web 管理界面，保留精简版 TG Bot 通知。不集成 STRM/Emby 功能。
 
 ---
 
 ## 当前进度
 
-| 阶段 | 状态 | 说明 |
-|---|---|---|
-| Phase 1 | 已完成 | Python 后端清理，保留涩花核心、115 OpenAPI、下载/同步/视频转存、STRM/Emby |
+| 阶段    | 状态   | 说明                                                                        |
+| ------- | ------ | --------------------------------------------------------------------------- |
+| Phase 1 | 已完成 | Python 后端清理，保留涩花核心、115 OpenAPI、下载/同步/视频转存、广告清理   |
 | Phase 2 | 已完成 | FastAPI server、6 个 API routers、SSE 日志流、Web 启动线程、Docker 端口映射 |
-| Phase 3 | 待执行 | 新会话实现 `web-ui/` 前端 |
+| Phase 3 | 待执行 | 新会话实现 `web-ui/` 前端                                                   |
 
 Phase 2 已验证：
 
@@ -71,17 +71,19 @@ TG115_DEBUG=1 PYTHONPATH="$PWD:$PWD/app:$PWD/app/utils:$PWD/app/core:$PWD/app/ha
 
 ## Docker 服务说明
 
-| 服务 | 镜像 | 说明 |
-|---|---|---|
-| `bot` | 自建（项目 Dockerfile）| 主服务，无 Chrome |
-| `selenium` | `selenium/standalone-chrome:latest` | 独立浏览器，`shm_size: 2gb` |
-| `flaresolverr` | `ghcr.io/flaresolverr/flaresolverr:latest` | CF 验证，可选 |
+| 服务           | 镜像                                       | 说明                        |
+| -------------- | ------------------------------------------ | --------------------------- |
+| `bot`          | 自建（项目 Dockerfile）                    | 主服务，无 Chrome           |
+| `selenium`     | `selenium/standalone-chrome:latest`        | 独立浏览器，`shm_size: 2gb` |
+| `flaresolverr` | `ghcr.io/flaresolverr/flaresolverr:latest` | CF 验证，可选               |
 
 主容器通过环境变量找到两个服务：
+
 ```
 REMOTE_SELENIUM_URL=http://selenium:4444/wd/hub
 FLARESOLVERR_URL=http://flaresolverr:8191/v1
 ```
+
 代码已支持，无需改动。
 
 ---
@@ -110,7 +112,7 @@ utils/cover_capture.py           封面截图
 ### 保留功能
 
 ```
-core/sehua_spider.py             涩花爬虫（核心）
+core/sehuatang_spider.py             涩花爬虫（核心）
 core/open_115.py                 115 API客户端
 core/selenium_browser.py         浏览器封装
 utils/ai.py                      AI重命名
@@ -138,7 +140,6 @@ init.py                          删除 aria2_client/tg_user_client/CRAWL_JAV_ST
 ### 新增
 
 ```
-utils/media_utils.py             create_strm_file + notice_emby_scan_library（已完成）
 web/server.py                    FastAPI入口（已完成）
 web/utils.py                     DB/YAML/日志流共享工具（已完成）
 web/routers/dashboard.py         Dashboard统计与趋势（已完成）
@@ -153,12 +154,12 @@ web/routers/system.py            系统状态、配置读写（已完成）
 
 ## TG Bot（保留命令）
 
-| 命令 | 功能 |
-|---|---|
-| `/start` | 帮助 |
-| `/reload` | 重载配置 |
-| `/csh [日期]` | 手动触发涩花爬取 |
-| `/rl` | 查看/清空重试列表 |
+| 命令          | 功能              |
+| ------------- | ----------------- |
+| `/start`      | 帮助              |
+| `/reload`     | 重载配置          |
+| `/csh [日期]` | 手动触发涩花爬取  |
+| `/rl`         | 查看/清空重试列表 |
 
 通知功能全保留（离线完成后推送）。
 
@@ -191,14 +192,14 @@ Phase 3 新会话从这里开始。前端开发时建议用 `VITE_API_BASE_URL=h
 
 ### 页面模块
 
-| 页面 | 核心功能 |
-|---|---|
-| Dashboard | 统计卡片 + 趋势折线图 + 版块饼图 + 最近活动 |
-| 涩花数据 | 分页表格、版块/日期/状态筛选、手动离线、批量操作 |
-| 策略管理 | 策略增删改、广告过滤规则、正则实时测试 |
-| 离线任务 | 重试队列查看、单条重试、清空 |
-| 爬取控制 | 日期触发、状态指示、**SSE实时日志滚动** |
-| 系统 | Token状态、配置编辑、日志级别 |
+| 页面      | 核心功能                                         |
+| --------- | ------------------------------------------------ |
+| Dashboard | 统计卡片 + 趋势折线图 + 版块饼图 + 最近活动      |
+| 涩花数据  | 分页表格、版块/日期/状态筛选、手动离线、批量操作 |
+| 策略管理  | 策略增删改、广告过滤规则、正则实时测试           |
+| 离线任务  | 重试队列查看、单条重试、清空                     |
+| 爬取控制  | 日期触发、状态指示、**SSE实时日志滚动**          |
+| 系统      | Token状态、配置编辑、日志级别                    |
 
 ---
 
@@ -261,7 +262,7 @@ zustand
 Telegram-115bot/
 ├── app/
 │   ├── core/
-│   │   ├── sehua_spider.py
+│   │   ├── sehuatang_spider.py
 │   │   ├── open_115.py
 │   │   ├── selenium_browser.py
 │   │   ├── offline_task_retry.py   ← 已精简
@@ -271,7 +272,6 @@ Telegram-115bot/
 │   │   └── offline_task_handler.py ← 待修复
 │   ├── utils/
 │   │   ├── ai.py
-│   │   ├── media_utils.py          ← 已新建
 │   │   ├── message_queue.py
 │   │   ├── sqlitelib.py
 │   │   ├── logger.py

@@ -1,17 +1,30 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Bot, Database, Gauge, Menu, ScrollText, ServerCog, Settings2, Sliders, X } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  Database,
+  Gauge,
+  Menu,
+  Moon,
+  ScrollText,
+  ServerCog,
+  Settings2,
+  Sliders,
+  Sun,
+  X,
+} from "lucide-react";
 
 import { API_BASE_URL } from "../api/client";
 import { cn } from "../lib/utils";
 import { useUiStore } from "../store/ui";
 import { Button } from "./ui";
 
-const navItems = [
+const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: Gauge },
   { to: "/sehua", label: "涩花数据", icon: Database },
-  { to: "/strategy", label: "策略管理", icon: Settings2 },
   { to: "/tasks", label: "离线任务", icon: ScrollText },
   { to: "/crawl", label: "爬取控制", icon: Activity },
+  { to: "/strategy", label: "爬虫配置", icon: Settings2 },
   { to: "/config", label: "配置管理", icon: Sliders },
   { to: "/system", label: "系统状态", icon: ServerCog },
 ];
@@ -19,6 +32,8 @@ const navItems = [
 export function AppLayout() {
   const sidebarOpen = useUiStore((state) => state.sidebarOpen);
   const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -48,7 +63,7 @@ export function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 space-y-0.5 p-2">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -97,6 +112,15 @@ export function AppLayout() {
             <Menu className="h-4 w-4" />
           </Button>
           <div className="text-xs text-muted-foreground">Telegram-115bot 管理界面</div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7"
+            onClick={toggleTheme}
+            aria-label="切换主题"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-5 md:px-6">
           <Outlet />

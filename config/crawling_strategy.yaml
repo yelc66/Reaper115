@@ -1,30 +1,9 @@
-# 涩花抓取策略
-
-# 标题正则过滤规则，可以设置多个
-# 满足匹配规则的数据将被保存，不满足的则自动放弃
-# 前面的策略如果满足则会被优先匹配
-# 例1：以下规则会只抓取【高清中文字幕】版块下，所有【无码字幕】和【无码破解】的作品并指定保存目录（目录留空则默认保存到版块目录），不满足规则的作品将放弃抓取！
 title_regular:
-    # 版块名称
-  - section_name: 高清中文字幕
-    # 策略名称
-    strategy_name: 无码字幕
-    # 正则表达式
-    pattern: "无码字幕"
-    # 指定保存目录用于分类，如果留空默认保存到版块目录
-    specify_save_path: /AV/涩花/无码字幕
-  - section_name: 高清中文字幕
-    strategy_name: 无码破解
-    pattern: "无码破解"
-    specify_save_path: /AV/涩花/无码破解
-
-# 例2：以下规则会爬取【亚洲无码原创】版块下的所有作品。其中[FC2]系列会保存到指定目录，其余作品保存到版块默认目录！
-# title_regular:
-#   - section_name: 亚洲无码原创
-#     strategy_name: FC2素人
-#     pattern: 'FC2PPV-+\d+'
-#     specify_save_path: /新增小姐姐/FC2素人
-#   - section_name: 亚洲无码原创
-#     strategy_name: 其他
-#     pattern: ".+"
-#     specify_save_path:
+- section_name: 高清中文字幕
+  strategy_name: 无码字幕
+  pattern: 无码字幕
+  specify_save_path: /AV/涩花/无码字幕
+- section_name: 高清中文字幕
+  strategy_name: 无码破解
+  pattern: 无码破解
+  specify_save_path: /AV/涩花/无码破解

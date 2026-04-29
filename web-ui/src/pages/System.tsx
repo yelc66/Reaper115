@@ -5,7 +5,7 @@ import { Badge, Card, ErrorState, LoadingState, PageHeader } from "../components
 import { errorMessage } from "../lib/utils";
 
 export function System() {
-  const status = useQuery({
+  const statusQuery = useQuery({
     queryKey: ["system", "status"],
     queryFn: systemApi.status,
     refetchInterval: 10000,
@@ -17,21 +17,21 @@ export function System() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <h2 className="mb-4 text-base font-semibold">运行状态</h2>
-          {status.isPending ? <LoadingState /> : null}
-          {status.isError ? <ErrorState message={errorMessage(status.error)} /> : null}
-          {status.data ? (
+          {statusQuery.isPending ? <LoadingState /> : null}
+          {statusQuery.isError ? <ErrorState message={errorMessage(statusQuery.error)} /> : null}
+          {statusQuery.data ? (
             <div className="space-y-3 text-sm">
-              <StatusLine label="115 OpenAPI" active={status.data.openapi_ready} />
-              <StatusLine label="Token 文件" active={status.data.token_file_exists} />
+              <StatusLine label="115 OpenAPI" active={statusQuery.data.openapiReady} />
+              <StatusLine label="Token 文件" active={statusQuery.data.tokenFileExists} />
               <StatusLine
                 label="爬虫状态"
-                active={status.data.crawl_running}
+                active={statusQuery.data.crawlRunning}
                 activeText="运行中"
                 inactiveText="空闲"
               />
               <StatusLine
                 label="调试模式"
-                active={status.data.debug_mode}
+                active={statusQuery.data.debugMode}
                 activeText="开启"
                 inactiveText="关闭"
               />
@@ -41,9 +41,9 @@ export function System() {
 
         <Card>
           <h2 className="mb-4 text-base font-semibold">路径</h2>
-          {status.isPending ? <LoadingState /> : null}
+          {statusQuery.isPending ? <LoadingState /> : null}
           <div className="space-y-3 text-xs">
-            {Object.entries(status.data?.paths ?? {}).map(([key, value]) => (
+            {Object.entries(statusQuery.data?.paths ?? {}).map(([key, value]) => (
               <div key={key}>
                 <div className="mb-0.5 text-muted-foreground">{key}</div>
                 <div className="break-all font-mono">{value}</div>

@@ -77,9 +77,6 @@ def try_to_offline2115_again():
                     init.openapi_115.rename(old_name, title)
                     new_final_path = f"{save_path}/{title}"
                     file_list = init.openapi_115.get_files_from_dir(new_final_path)
-                    from app.utils.media_utils import create_strm_file, notice_emby_scan_library
-                    create_strm_file(new_final_path, file_list)
-                    notice_emby_scan_library(new_final_path)
 
                     if len(link) > 600:
                         link = link[:600] + "..."
