@@ -116,7 +116,7 @@ export function AppLayout({ authRequired, onLogout }: { authRequired?: boolean; 
           </Button>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">Reaper115</div>
-            <div className="truncate text-xs text-muted-foreground">Telegram-115bot 管理界面</div>
+            <div className="truncate text-xs text-muted-foreground">Reaper115 管理界面</div>
           </div>
           {authRequired ? (
             <Button

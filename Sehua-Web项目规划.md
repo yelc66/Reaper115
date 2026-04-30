@@ -6,7 +6,7 @@
 
 ## 项目目标
 
-从 Telegram-115bot 分支出 `feature/sehua-web`，专注涩花资源的**自动抓取 → 策略过滤 → 离线入 115 → 广告清理**，并提供 Web 管理界面，保留精简版 TG Bot 通知。不集成 STRM/Emby 功能。
+从 Reaper115 主线继续开发，专注涩花资源的**自动抓取 → 策略过滤 → 离线入 115 → 广告清理**，并提供 Web 管理界面，保留精简版 TG Bot 通知。不集成 STRM/Emby 功能。
 
 ---
 
@@ -259,7 +259,7 @@ zustand
 ## 项目目录结构
 
 ```
-Telegram-115bot/
+Reaper115/
 ├── app/
 │   ├── core/
 │   │   ├── sehuatang_spider.py

@@ -1,5 +1,5 @@
 <div align="center">
-    <h1>115Bot - Telegram Bot</h1>
+    <h1>Reaper115</h1>
     <p>Sehua crawler + 115 offline downloader with a web management UI</p>
 </div>
 
@@ -38,8 +38,8 @@ A Python-based Telegram bot focused on sehua content crawling and 115 Network Di
 
 1. **Clone and configure**
    ```bash
-   git clone https://github.com/yelc668/Telegram-115bot.git
-   cd Telegram-115bot
+   git clone https://github.com/yelc668/Reaper115.git
+   cd Reaper115
    mkdir -p config tmp
    cp app/config.yaml.example config/config.yaml
    ```
