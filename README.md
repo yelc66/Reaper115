@@ -1,158 +1,171 @@
 <div align="center">
     <h1>Reaper115</h1>
-    <p>Sehua crawler + 115 offline downloader with a web management UI</p>
+    <p>涩花资源抓取 + 115 离线下载 + Web 管理后台</p>
 </div>
 
-A Python-based Telegram bot focused on sehua content crawling and 115 Network Disk offline downloads, paired with a FastAPI + React web management dashboard.
+Reaper115 是一个基于 Python 的 Telegram Bot 项目，聚焦涩花资源自动抓取、策略过滤、115 网盘离线下载和失败任务重试，并提供 FastAPI + React 构建的 Web 管理后台。
 
-## Features
+## 功能特性
 
-- **Sehua Spider**
-  - Automatically crawls sehuatang.net on a daily schedule
-  - Configurable sections and save paths
-  - Title filter rules with regex matching via web UI
-  - Optional cover image notifications via Telegram
+- **涩花资源抓取**
+  - 支持按计划自动抓取 sehuatang.net
+  - 支持配置不同分区和保存路径
+  - 支持通过 Web UI 管理标题过滤规则和正则测试
+  - 支持通过 Telegram 发送下载通知，可选附带封面图
 
-- **Web Management UI**
-  - Dashboard with crawl stats and trends
-  - Browse and download crawled sehua resources
-  - Strategy rule CRUD (per-section filter rules with regex test)
-  - Manual crawl trigger with real-time SSE log stream
-  - Offline task retry queue management
-  - System config and connectivity check
+- **Web 管理后台**
+  - 仪表盘展示抓取统计和趋势
+  - 浏览、检索和下载已抓取资源
+  - 管理分区策略规则，支持规则增删改查和正则验证
+  - 手动触发抓取任务，并通过 SSE 查看实时日志
+  - 管理 115 离线任务失败重试队列
+  - 查看和编辑系统配置，执行连接检查
 
-- **115 Offline Download**
-  - Submit resources directly to 115 Network Disk
-  - Based on 115 Open Platform API for stable performance
-  - Retry queue for failed downloads
+- **115 离线下载**
+  - 支持将资源提交到 115 网盘离线下载
+  - 基于 115 Open Platform API
+  - 支持失败任务进入重试队列
 
-## Quick Start
+## 快速开始
 
-### Requirements
+### 环境要求
 
 - Docker + Docker Compose
-- 115 Open Platform App ID ([apply here](https://open.115.com/))
-- A Telegram bot token
+- 115 Open Platform App ID（[申请入口](https://open.115.com/)）
+- Telegram Bot Token
 
-### Deploy with Docker Compose
+### 使用 Docker Compose 部署
 
-1. **Clone and configure**
+1. **克隆并初始化配置**
+
    ```bash
-   git clone https://github.com/yelc668/Reaper115.git
+   git clone https://github.com/yelc66/Reaper115.git
    cd Reaper115
    mkdir -p config tmp
    cp app/config.yaml.example config/config.yaml
    ```
 
-   Edit `config/config.yaml` — minimum required fields:
-   - `bot_token` — Telegram bot token
-   - `allowed_user` — your Telegram user ID
-   - `115_app_id` — from 115 Open Platform
+   编辑 `config/config.yaml`，至少需要填写：
 
-2. **Start**
+   - `bot_token`：Telegram Bot Token
+   - `allowed_user`：允许使用 Bot 的 Telegram 用户 ID
+   - `115_app_id`：115 Open Platform App ID
+
+2. **启动服务**
+
    ```bash
    docker compose up -d
    ```
 
-   The bot starts on Telegram and the web UI is available at `http://<host>:8000`.
+   启动后 Telegram Bot 会开始运行，Web UI 默认可通过 `http://<host>:8000` 访问。
 
-3. **Build locally** (optional)
+3. **本地构建镜像**（可选）
+
    ```bash
    docker build -t reaper115-bot:latest .
    docker compose up -d
    ```
 
-### Local Development
+## 本地开发
 
-For local development without Docker, set `TG115_DEBUG=1` to use project-local paths:
+不使用 Docker 时，可以设置 `TG115_DEBUG=1`，让项目使用本地目录作为运行路径：
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 mkdir -p config tmp
 cp app/config.yaml.example config/config.yaml
-# fill bot_token, allowed_user, 115_app_id in config/config.yaml
+# 在 config/config.yaml 中填写 bot_token、allowed_user、115_app_id
 TG115_DEBUG=1 python app/115bot.py
 ```
 
-Web UI dev server (proxies API to `http://127.0.0.1:8000`):
+Web UI 开发服务默认将 API 代理到 `http://127.0.0.1:8000`：
 
 ```bash
-cd web-ui && cp .env.example .env   # set VITE_API_BASE_URL=http://127.0.0.1:8000
-npm install && npm run dev          # http://localhost:5173
+cd web-ui && cp .env.example .env
+# 设置 VITE_API_BASE_URL=http://127.0.0.1:8000
+npm install && npm run dev
 ```
 
-## Configuration
+Web UI 默认访问地址为 `http://localhost:5173`。
 
-All options are documented in `app/config.yaml.example`.
+## 配置说明
 
-### Key spider options (`sehuatang_spider` in `config.yaml`)
+完整配置项请参考 `app/config.yaml.example`。
 
-| Key                 | Default | Description                                              |
-|---------------------|---------|----------------------------------------------------------|
-| `enable`            | false   | Master switch for the spider                             |
-| `notify_me`         | true    | Send Telegram notification on each successful download   |
-| `notify_with_image` | true    | Attach cover image; false = text-only, skips image fetch |
-| `sort_by_year_month`| false   | Create year/month subdirectories in save path            |
-| `sections`          | []      | List of `{name, save_path}` sections to crawl            |
+### 涩花抓取配置
 
-### Crawl schedule
+`config.yaml` 中的 `sehuatang_spider` 是抓取相关配置：
 
-By default the spider runs at **03:00** daily. Configurable in `config.yaml` under `scheduler`.
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enable` | `false` | 是否启用涩花抓取 |
+| `notify_me` | `true` | 成功提交下载后是否发送 Telegram 通知 |
+| `notify_with_image` | `true` | 通知是否附带封面图，关闭后跳过图片抓取 |
+| `sort_by_year_month` | `false` | 是否按年月创建保存目录 |
+| `sections` | `[]` | 要抓取的分区列表，格式为 `{name, save_path}` |
+
+### 定时任务
+
+默认每天 **03:00** 执行抓取任务，可在 `config.yaml` 的 `scheduler` 中调整。
 
 ### Selenium / FlareSolverr
 
-The spider uses SeleniumBase. Two options for bypassing Cloudflare:
+抓取流程使用 SeleniumBase。绕过 Cloudflare 时可选择：
 
-- **FlareSolverr** (recommended): set `FLARESOLVERR_URL` env var and uncomment the `flaresolverr` service in `docker-compose.yaml`
-- **Remote Selenium**: set `REMOTE_SELENIUM_URL` and uncomment the `chrome` service
+- **FlareSolverr**：推荐方式，设置 `FLARESOLVERR_URL` 环境变量，并在 `docker-compose.yaml` 中启用 `flaresolverr` 服务
+- **Remote Selenium**：设置 `REMOTE_SELENIUM_URL`，并在 `docker-compose.yaml` 中启用 `chrome` 服务
 
-### Proxy
+### 代理
 
-Set `HTTP_PROXY` / `HTTPS_PROXY` env vars in `docker-compose.yaml` if needed.
+如需代理，可在 `docker-compose.yaml` 中设置 `HTTP_PROXY` / `HTTPS_PROXY` 环境变量。
 
-## Bot Commands
+## Bot 命令
 
-| Command        | Description                          |
-|----------------|--------------------------------------|
-| `/start`       | Show help                            |
-| `/reload`      | Reload configuration from disk       |
-| `/rl`          | Show offline retry list              |
-| `/csh_yesterday` | Crawl yesterday's sehua data       |
-| `/csh_today`   | Crawl today's sehua data             |
-| `/csh_7days`   | Crawl recent 7 days of sehua data    |
-| `/q`           | Cancel current conversation          |
+| 命令 | 说明 |
+| --- | --- |
+| `/start` | 显示帮助 |
+| `/reload` | 重新加载配置 |
+| `/rl` | 查看离线失败重试队列 |
+| `/csh_yesterday` | 抓取昨天的涩花数据 |
+| `/csh_today` | 抓取今天的涩花数据 |
+| `/csh_7days` | 抓取最近 7 天的涩花数据 |
+| `/q` | 取消当前会话 |
 
-Custom sehua crawls are still available by manually sending `/csh YYYYMMDD`.
+也可以手动发送 `/csh YYYYMMDD` 抓取指定日期的数据。
 
-## Directory Structure
+## 项目结构
 
-```
+```text
 .
 ├── app/
-│   ├── 115bot.py              # Entry point
-│   ├── config.yaml.example    # Configuration template
-│   ├── core/                  # Spider, scheduler, 115 API client
-│   ├── handlers/              # Telegram command handlers
-│   ├── init.py                # Global state and startup
-│   ├── utils/                 # DB, message queue, helpers
-│   └── web/                   # FastAPI server and routers
-├── web-ui/                    # Vite + React 18 + TypeScript frontend
-├── config/                    # Runtime config (gitignored)
+│   ├── 115bot.py              # 入口文件
+│   ├── config.yaml.example    # 配置模板
+│   ├── core/                  # 抓取、调度、115 API 客户端
+│   ├── handlers/              # Telegram 命令处理
+│   ├── init.py                # 全局状态和启动初始化
+│   ├── utils/                 # 数据库、消息队列和工具函数
+│   └── web/                   # FastAPI 服务和路由
+├── web-ui/                    # Vite + React 18 + TypeScript 前端
+├── config/                    # 运行时配置，默认被 gitignore
 ├── docker-compose.yaml
 ├── Dockerfile
 └── requirements.txt
 ```
 
-## Web UI Stack
+## Web UI 技术栈
 
 Vite · React 18 · TypeScript · Tailwind CSS · TanStack Query v5 · React Router v6 · Recharts
 
-Pages: Dashboard · Sehua Data · Strategy · Crawl · Tasks · Config · System
+主要页面：Dashboard · Sehua Data · Strategy · Crawl · Tasks · Config · System
 
-## License
+## 致谢
 
-MIT License — see [LICENSE](LICENSE)
+感谢原项目 [qiqiandfei/Telegram-115bot](https://github.com/qiqiandfei/Telegram-115bot) 提供的基础实现与思路参考。
 
-## Disclaimer
+## 许可证
 
-This project is for educational and research purposes only. Comply with all applicable laws and regulations. Users assume all risks.
+MIT License，详见 [LICENSE](LICENSE)。
+
+## 免责声明
+
+本项目仅用于学习和研究。请遵守所在地法律法规以及相关平台服务条款，使用者需自行承担使用风险。
