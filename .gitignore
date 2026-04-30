@@ -31,6 +31,9 @@ ENV/
 *.swp
 *.swo
 
+# Local planning & idea docs
+Sehua-Web项目规划.md
+
 # Project specific
 .env
 **/config.yaml
