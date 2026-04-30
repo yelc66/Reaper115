@@ -14,7 +14,7 @@ The active branch is **`feature/sehua-web`** — bot narrowed to sehua-only craw
 
 ```bash
 # Local Docker build
-docker build -t 115bot:latest .
+docker build -t reaper115-bot:latest .
 docker compose up -d
 
 # Run inside container with live config

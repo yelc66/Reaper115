@@ -1,5 +1,5 @@
 services:
-  115-bot:
+  reaper115-bot:
     container_name: tg-bot-115
     environment:
       TZ: ${TZ:-Asia/Shanghai}
@@ -17,7 +17,7 @@ services:
       
       # 根据实际需要添加其他不需代理的地址
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,chrome,flaresolverr}
-    image: ${BOT_IMAGE:-qiqiandfei/115-bot:latest}
+    image: ${BOT_IMAGE:-yelc668/reaper115-bot:latest}
     # 共享内存大小，防止浏览器崩溃，有条件可以多给点
     shm_size: "2gb"
     # 浏览器初始化失败时尝试打开此选项

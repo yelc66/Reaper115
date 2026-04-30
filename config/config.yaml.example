@@ -5,14 +5,16 @@
 # 日志级别
 # debug|info|warning|error|critical
 log_level: info
-
 ############################################Web管理界面##################################
 web:
   # 是否启动 FastAPI Web API
   enable: true
+  # 容器内监听地址，Docker 部署保持 0.0.0.0
+  host: 0.0.0.0
   # 容器内监听端口；docker-compose 默认映射到宿主机 WEB_PORT 或 8000
   port: 8000
-
+  # Web UI 登录认证密钥；留空表示不启用认证。也可通过环境变量 WEB_AUTH_KEY 设置。
+  auth_key: ""
 ############################################Telegram设置##################################
 # bot token （必填）
 # 机器人唯一Token，如果没有@BotFather创建
@@ -52,15 +54,32 @@ clean_policy:
   # 文件小于设置值则自动删除单位K,M,G
   less_than: 400M
 
-##########################################AI#######################################
-# AI支持
-ai:
-  # 请求地址
-  api_url: https://api.siliconflow.cn/v1
-  # api_key
-  api_key: sk-xxxxxxxxxxxxxxxxxxx
-  # 模型
-  model: deepseek-ai/DeepSeek-V3.2
+# 设置分类文件夹
+# 分类文件夹设置只针对离线任务，离线下载完成后，会弹出需要移动到的分类文件夹，可以设置多个
+category_folder:
+  # 电影下的分类目录，不能修改
+  - name: movies
+    # 选择保存目录的第一级分类目录，不建议修改
+    display_name: 电影
+    # 一级分类目录(电影)下的二级分类，可按需修改或添加
+    path_map:
+        # 显示名称，可按需修改
+      - name: 外语电影
+        # 对应115上的完整路径，可以按需修改
+        path: /影视/电影/外语电影
+      - name: 华语电影
+        path: /影视/电影/华语电影
+      - name: 动画电影
+        path: /影视/电影/动画电影
+  # AV
+  # 结构与电影完全一致不再赘述
+  - name: av
+    display_name: AV
+    path_map:
+      - name: 码の谜
+        path: /AV/有码
+      - name: 祼の真
+        path: /AV/无码
 
 #############################################涩花Spider##################################
 # 每天凌晨开启爬虫，爬取前一天的数据并离线到115
@@ -103,6 +122,7 @@ sehuatang_spider:
 #      save_path: /AV/涩花/VR视频区
 #    - name: 欧美无码
 #      save_path: /AV/涩花/欧美无码
+
   # 通知我
   notify_me: true
   # 推送通知时是否附带封面图片；设为 false 可跳过图片下载，加快爬取速度
@@ -110,13 +130,113 @@ sehuatang_spider:
   # 按年月整理，开启后会自动在保存目录创建年/月的文件夹
   sort_by_year_month: false
 
-#############################################JavBee Spider##################################
-javbee_spider:
-  # 是否开启 JavBee 爬虫
+
+#############################################电影订阅####################################
+# 如果留空则无法通过“sm”命令订阅电影
+# 自动订阅https://nullbr.online/上的资源，有满足要求的自动离线到115
+# 自动订阅需要申请app_id，参考申请方法
+# https://nullbr.online/api?title=00.%F0%9F%93%A3api%E5%BC%80%E6%94%BE%E8%AE%A1%E5%88%92
+x_app_id: your_app_id
+x_api_key: your_api_key
+# 订阅条件，全部满足才订阅
+sub_condition:
+  # 包含中字
+  zh_cn: true
+  # Dolby Vision
+  dolby_vision: false
+  # 分辨率优先级
+  resolution_priority:
+    - 2160
+    - 1080
+##########################################Aria2#######################################
+# 设置Aria2可选择将离线的影片推送到Aria2
+# 默认关闭
+aria2:
+  # 是否启用
   enable: false
-  # 指定每天的同步时间(24h)
-  sync_time: "04:00"
-  # JavBee 地址
-  base_url: www.javbee.me
-  # 通知我
-  notify_me: true
+  # 指定设备名称, 例如“我的群晖”，“我的飞牛”
+  device_name: 我的飞牛
+  # Arai2地址 http(s)://your_aria2_host
+  host: http://your_aria2_host
+  # Aria2 RPC端口
+  port: 6800
+  # Aria2 密钥
+  rpc_secret: your_aria2_rpc_secret
+  # 下载目录 (Aari2容器中的下载位置)
+  download_path: "/Downloads"
+  ##########################################AI#######################################
+# AI支持
+ai:
+  # 请求地址
+  api_url: https://api.siliconflow.cn/v1
+  # api_key
+  api_key: sk-xxxxxxxxxxxxxxxxxxx
+  # 模型
+  model: deepseek-ai/DeepSeek-V3.2
+##########################################RSSHub#######################################
+rsshub:
+  # RSSHub地址,格式 http(s)://ip(域名):端口
+  rss_host: https://your_rsshub_website
+  # 需要订阅的RSS源
+  # JavBus
+  javbus:
+    # 单次订阅最大上限
+    # 0: 不限制, 其他数字: 限制数量
+    # 如按厂商订阅，结果可能过千，建议设置一个合理的上限
+    max_subscribe: 0
+    # 订阅超时
+    timeout: 60
+    # 需要订阅的类别
+    # 订阅类别可以根据自己的喜好添加，route参数可以参考RSSHub的javbus路由
+    # 基于类别的路由可参考 https://www.javbus.com/genre，选择喜欢的类别，点击后记录URL中的路由（https://www.javbus.com/genre后面的部分）
+    category:
+        # 最新，订阅首页30条
+      - name: 最新
+        # 路由格式 “/javbus/xxx/xxx”
+        route: /javbus/page/1
+        # 是否需要额外输入参数
+        need_input: false
+        # 115保存路径，按需修改
+        save_path: /AV/JavBus/最新
+      - name: 女优
+        need_input: true
+        route: /javbus/search
+        save_path: /AV/JavBus/女优
+      - name: 无码推荐
+        need_input: false
+        route: /javbus/uncensored/genre/1bc
+        save_path: /AV/JavBus/无码推荐
+      - name: 无码新人
+        need_input: false
+        route: /javbus/uncensored/genre/gre020
+        save_path: /AV/JavBus/无码新人
+      - name: 厂商
+        route: /javbus/search
+        need_input: true
+        save_path: /AV/JavBus/厂商
+    # 通知我
+    notify_me: true
+    # 按年月整理，开启后会自动在保存目录创建年月的文件夹
+    sort_by_year_month: false
+  # 草榴1024
+  t66y:
+    # 订阅超时
+    timeout: 60
+    # 需要订阅的版块，不需要订阅的直接注释，不要修改名称
+    sections:
+        # 版块名称，请勿修改
+      - name: 亚洲无码原创
+        # 115保存路径，按需修改
+        save_path: /AV/1024/亚洲无码原创
+      - name: 亚洲有码原创
+        save_path: /AV/1024/亚洲有码原创
+      - name: 国产原创
+        save_path: /AV/1024/国产原创
+      - name: 中字原创
+        save_path: /AV/1024/中字原创
+      - name: AI破解原创
+        save_path: /AV/1024/AI破解原创
+    # 通知我
+    notify_me: true
+    # 按年月整理，开启后会自动在保存目录创建年月的文件夹
+    sort_by_year_month: false

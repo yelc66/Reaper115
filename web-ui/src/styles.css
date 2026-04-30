@@ -2,37 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme (default) */
+/* Light Liquid Glass theme (default) */
 :root,
-[data-theme="dark"] {
-  --background: 224 32% 9%;
-  --surface: 226 28% 13%;
-  --surface-elevated: 226 26% 17%;
-  --border: 225 22% 22%;
-  --muted: 226 26% 17%;
-  --muted-foreground: 220 18% 56%;
-  --foreground: 216 32% 94%;
-  --primary: 234 80% 68%;
+[data-theme="light"] {
+  --background: 210 67% 97%;
+  --surface: 0 0% 100%;
+  --surface-elevated: 207 100% 96%;
+  --border: 209 54% 86%;
+  --muted: 207 100% 95%;
+  --muted-foreground: 216 12% 48%;
+  --foreground: 240 3% 11%;
+  --primary: 211 100% 50%;
   --primary-foreground: 0 0% 100%;
   --destructive: 0 65% 60%;
   --success: 158 52% 48%;
   --warning: 38 92% 54%;
 }
 
-/* Light theme */
-[data-theme="light"] {
-  --background: 220 24% 97%;
-  --surface: 0 0% 100%;
-  --surface-elevated: 220 20% 94%;
-  --border: 220 16% 88%;
-  --muted: 220 20% 94%;
-  --muted-foreground: 220 12% 48%;
-  --foreground: 224 28% 14%;
-  --primary: 234 72% 58%;
+[data-theme="dark"] {
+  --background: 218 39% 10%;
+  --surface: 219 36% 14%;
+  --surface-elevated: 214 38% 18%;
+  --border: 213 24% 25%;
+  --muted: 214 38% 18%;
+  --muted-foreground: 213 22% 70%;
+  --foreground: 207 74% 96%;
+  --primary: 203 100% 61%;
   --primary-foreground: 0 0% 100%;
-  --destructive: 0 68% 52%;
-  --success: 158 56% 38%;
-  --warning: 38 92% 44%;
+  --destructive: 0 65% 60%;
+  --success: 158 52% 48%;
+  --warning: 38 92% 54%;
 }
 
 * {
@@ -43,12 +42,22 @@ body {
   margin: 0;
   min-width: 320px;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "SF Pro Display", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  background: hsl(var(--background));
+  background:
+    radial-gradient(circle at 18% 12%, rgba(90, 203, 250, 0.25), transparent 28rem),
+    radial-gradient(circle at 82% 6%, rgba(176, 217, 255, 0.42), transparent 26rem),
+    linear-gradient(180deg, #ffffff 0%, #f0f7ff 42%, #f0f2f5 100%);
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(0, 122, 255, 0.2), transparent 28rem),
+    radial-gradient(circle at 82% 6%, rgba(90, 203, 250, 0.12), transparent 26rem),
+    linear-gradient(180deg, #09111f 0%, #101a2b 52%, #0b1220 100%);
 }
 
 button,
@@ -62,7 +71,6 @@ table {
   border-collapse: collapse;
 }
 
-/* Scrollbar — subtle on dark bg */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -83,10 +91,12 @@ table {
   fill: hsl(var(--muted-foreground));
 }
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: hsl(var(--surface-elevated)) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(20px);
   color: hsl(var(--foreground)) !important;
+  box-shadow: 0 18px 48px rgba(28, 28, 30, 0.12) !important;
 }
 .recharts-tooltip-label {
   color: hsl(var(--muted-foreground)) !important;

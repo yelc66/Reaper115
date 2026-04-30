@@ -40,17 +40,16 @@ def try_to_offline2115_again():
         init.logger.info("重试列表为空，暂时没有需要重试的任务！")
         return
 
-    from app.core.offline_task_retry import create_offline_url
-    create_offline_url_list = create_offline_url(failed_tasks)
-    for offline_tasks in create_offline_url_list:
-        if not offline_tasks:
-            continue
-        offline_success = init.openapi_115.offline_download_specify_path(offline_tasks, failed_tasks[0]['save_path'])
-        if offline_success:
-            init.logger.info(f"重试任务 {offline_tasks} 添加离线成功")
-        else:
-            init.logger.error(f"重试任务 {offline_tasks} 添加离线失败")
-        time.sleep(2)
+    from app.core.offline_task_retry import create_offline_group_by_save_path
+    offline_groups = create_offline_group_by_save_path(failed_tasks)
+    for save_path, (item_ids, batches) in offline_groups.items():
+        for batch_tasks, batch_ids in batches:
+            offline_success = init.openapi_115.offline_download_specify_path(batch_tasks, save_path)
+            if offline_success:
+                init.logger.info(f"重试任务批次提交成功，路径: {save_path}，共 {len(batch_ids)} 个")
+            else:
+                init.logger.error(f"重试任务批次提交失败，路径: {save_path}，共 {len(batch_ids)} 个")
+            time.sleep(2)
 
     time.sleep(300)
 

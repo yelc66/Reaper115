@@ -19,10 +19,11 @@ export default {
         "surface-elevated": "hsl(var(--surface-elevated))",
       },
       boxShadow: {
-        panel: "0 0 0 1px hsl(var(--border)), 0 2px 8px rgba(0,0,0,0.12)",
+        panel: "0 18px 52px rgba(28, 28, 30, 0.10), inset 0 1px 0 rgba(255,255,255,0.72)",
+        glass: "0 22px 70px rgba(0, 122, 255, 0.16), 0 10px 28px rgba(28,28,30,0.10)",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["SF Pro Display", "Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
       },
     },
   },

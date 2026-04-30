@@ -31,6 +31,7 @@ type CrawlerFormState = {
   sehuaNotifyMe: boolean;
   sehuaNotifyWithImage: boolean;
   sehuaSortByYearMonth: boolean;
+  sehuaRenameByTitle: boolean;
   sehuaSections: SehuaSection[];
 };
 
@@ -45,6 +46,7 @@ function toCrawlerFormState(config: Record<string, unknown>): CrawlerFormState {
     sehuaNotifyMe: sehuaConfig.notify_me !== false,
     sehuaNotifyWithImage: sehuaConfig.notify_with_image !== false,
     sehuaSortByYearMonth: (sehuaConfig.sort_by_year_month as boolean) || false,
+    sehuaRenameByTitle: (sehuaConfig.rename_by_title as boolean) || false,
     sehuaSections: ((sehuaConfig.sections as Array<{ name: string; save_path: string }> | undefined) || []).map(
       (section) => ({
         name: section.name,
@@ -69,6 +71,7 @@ function toCrawlerApiConfig(
       notify_me: formState.sehuaNotifyMe,
       notify_with_image: formState.sehuaNotifyWithImage,
       sort_by_year_month: formState.sehuaSortByYearMonth,
+      rename_by_title: formState.sehuaRenameByTitle,
       sections: formState.sehuaSections
         .map((section) => ({
           name: section.name.trim(),
@@ -199,22 +202,33 @@ function CrawlerConfigPanel() {
             onCheckedChange={(checked) => patchForm("sehuaSortByYearMonth", checked)}
           />
         </Row>
+        <Row label="以标题重命名" hint="广告清理后，将 115 下载目录重命名为 sehua 标题">
+          <Switch
+            checked={formState.sehuaRenameByTitle}
+            onCheckedChange={(checked) => patchForm("sehuaRenameByTitle", checked)}
+          />
+        </Row>
         <Row label="爬取版块" hint="选择版块及对应 115 保存路径，至少填一个">
           <div className="space-y-2">
             {formState.sehuaSections.map((section, sectionIndex) => (
               <div key={sectionIndex} className="flex items-center gap-2">
                 <Select
                   value={section.name}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const newName = event.target.value;
                     patchForm(
                       "sehuaSections",
-                      formState.sehuaSections.map((currentSection, currentIndex) =>
-                        currentIndex === sectionIndex
-                          ? { ...currentSection, name: event.target.value }
-                          : currentSection,
-                      ),
-                    )
-                  }
+                      formState.sehuaSections.map((currentSection, currentIndex) => {
+                        if (currentIndex !== sectionIndex) return currentSection;
+                        const autoPath = `/AV/涩花/${currentSection.name}`;
+                        const savePath =
+                          currentSection.savePath === autoPath
+                            ? `/AV/涩花/${newName}`
+                            : currentSection.savePath;
+                        return { name: newName, savePath };
+                      }),
+                    );
+                  }}
                   className="w-40 shrink-0"
                 >
                   {SEHUA_SECTION_OPTIONS.map((option) => (
@@ -254,12 +268,14 @@ function CrawlerConfigPanel() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() =>
+              onClick={() => {
+                const usedNames = new Set(formState.sehuaSections.map((s) => s.name));
+                const defaultName = SEHUA_SECTION_OPTIONS.find((o) => !usedNames.has(o)) ?? SEHUA_SECTION_OPTIONS[0];
                 patchForm("sehuaSections", [
                   ...formState.sehuaSections,
-                  { name: "国产原创", savePath: "/AV/涩花/国产原创" },
-                ])
-              }
+                  { name: defaultName, savePath: `/AV/涩花/${defaultName}` },
+                ]);
+              }}
             >
               <Plus className="h-4 w-4" />
               添加版块
@@ -499,16 +515,18 @@ function Section({
 }) {
   return (
     <Card>
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="mb-5">
         <h2 className="text-base font-semibold">{title}</h2>
-        {onSave ? (
+      </div>
+      <div className="divide-y divide-border">{children}</div>
+      {onSave ? (
+        <div className="mt-5 flex justify-end border-t border-border pt-4">
           <Button size="sm" onClick={onSave} loading={saving}>
             <Save className="h-3.5 w-3.5" />
             {justSaved ? "已保存 ✓" : "保存"}
           </Button>
-        ) : null}
-      </div>
-      <div className="divide-y divide-border">{children}</div>
+        </div>
+      ) : null}
     </Card>
   );
 }

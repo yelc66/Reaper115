@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -15,6 +14,10 @@ sehua_download_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="
 
 
 class BatchDownloadRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list)
+
+
+class BatchDeleteRequest(BaseModel):
     ids: list[int] = Field(default_factory=list)
 
 
@@ -39,41 +42,18 @@ def _process_manual_download(item: dict):
     title = item.get("title") or f"sehua-{item.get('id')}"
     magnet = item.get("magnet")
     save_path = item.get("save_path")
-    info_hash = ""
 
     if not magnet or not save_path:
-        init.logger.warn(f"[Web][涩花] {title} 缺少磁力或保存路径，跳过后处理")
+        init.logger.warn(f"[Web][涩花] {title} 缺少磁力或保存路径，跳过")
         return
 
-    try:
-        init.logger.info(f"[Web][涩花] 开始检查手动离线任务: {title}")
-        download_success, resource_name, info_hash = init.openapi_115.check_offline_download_success(magnet)
-
-        if not download_success:
-            init.logger.warn(f"[Web][涩花] {title} 离线未完成或超时，暂不标记为已下载")
-            return
-
-        final_path = f"{save_path}/{resource_name}"
-        init.logger.info(f"[Web][涩花] {title} 离线完成，开始广告清理: {final_path}")
-
-        if init.openapi_115.is_directory(final_path):
-            init.openapi_115.auto_clean_all(final_path)
-        else:
-            temp_folder = Path(resource_name).stem
-            init.openapi_115.create_dir_for_file(save_path, temp_folder)
-            init.openapi_115.move_file(final_path, f"{save_path}/{temp_folder}")
-            final_path = f"{save_path}/{temp_folder}"
-            init.openapi_115.auto_clean_all(final_path)
-
-        db_execute("UPDATE sehua_data SET is_download = 1 WHERE id = ?", (item["id"],))
-        init.logger.info(f"[Web][涩花] {title} 手动离线后处理完成")
-
-    except Exception as exc:
-        init.logger.error(f"[Web][涩花] {title} 手动离线后处理失败: {exc}")
-    finally:
-        if info_hash:
-            time.sleep(1)
-            init.openapi_115.del_offline_task(info_hash, del_source_file=0)
+    # 提交成功后直接标记 is_download=1，后处理由下次调度的 sehua_post_process 完成
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db_execute(
+        "UPDATE sehua_data SET is_download=1, submitted_at=? WHERE id=?",
+        (now_str, item["id"])
+    )
+    init.logger.info(f"[Web][涩花] {title} 已提交离线，后处理等待下次调度")
 
 
 @router.get("")
@@ -139,6 +119,16 @@ def batch_download(payload: BatchDownloadRequest):
             failed.append(row["id"])
 
     return {"ok": len(failed) == 0, "submitted": submitted, "failed": failed, "processing": submitted}
+
+
+@router.delete("/batch-delete")
+def batch_delete(payload: BatchDeleteRequest):
+    if not payload.ids:
+        raise HTTPException(status_code=400, detail="ids cannot be empty")
+    placeholders = ",".join(["?"] * len(payload.ids))
+    deleted = db_query_one(f"SELECT COUNT(*) FROM sehua_data WHERE id IN ({placeholders})", tuple(payload.ids)) or 0
+    db_execute(f"DELETE FROM sehua_data WHERE id IN ({placeholders})", tuple(payload.ids))
+    return {"ok": True, "deleted": deleted}
 
 
 @router.delete("/{item_id}")

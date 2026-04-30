@@ -2,9 +2,11 @@
 
 import os
 import json
+import asyncio
 
 import requests
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import init
@@ -172,3 +174,62 @@ def test_115_config():
 
     message = payload.get("message") if isinstance(payload, dict) else "unknown error"
     raise HTTPException(status_code=400, detail=f"115 验证失败: {message}")
+
+
+# ---------- 115 扫码授权 ----------
+
+_qr_session: dict = {}
+
+
+@router.get("/115/qrcode")
+def get_115_qrcode():
+    app_id = init.bot_config.get("115_app_id", "")
+    if not _has_real_value(app_id, "your_115_app_id"):
+        raise HTTPException(status_code=400, detail="115 App ID 未填写，请先在配置管理中填写")
+
+    if init.openapi_115 is None:
+        from app.core.open_115 import OpenAPI_115
+        init.openapi_115 = OpenAPI_115.__new__(OpenAPI_115)
+        init.openapi_115.access_token = ""
+        init.openapi_115.refresh_token = ""
+        init.openapi_115.lock = __import__("threading").Lock()
+        init.openapi_115.refresh_lock = __import__("threading").Lock()
+
+    try:
+        session = init.openapi_115.auth_pkce_get_qr(app_id)
+        _qr_session.clear()
+        _qr_session.update(session)
+        return {"ok": True, "qr_b64": session["qr_b64"]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/115/qrcode/status")
+async def poll_115_qrcode_status():
+    if not _qr_session:
+        raise HTTPException(status_code=400, detail="请先获取二维码")
+
+    async def event_stream():
+        while True:
+            try:
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: init.openapi_115.auth_pkce_poll(
+                        _qr_session["uid"],
+                        _qr_session["time"],
+                        _qr_session["sign"],
+                        _qr_session["verifier"],
+                        _qr_session["app_id"],
+                    ),
+                )
+                yield f"data: {json.dumps(result, ensure_ascii=False)}\n\n"
+                if result["done"]:
+                    if result["status"] == "success":
+                        init.initialize_115open()
+                    break
+            except Exception as exc:
+                yield f"data: {json.dumps({'status': 'error', 'done': True, 'message': str(exc)})}\n\n"
+                break
+            await asyncio.sleep(2)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

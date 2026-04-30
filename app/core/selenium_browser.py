@@ -9,13 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 import init
-from seleniumbase import SB
-import subprocess
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # Flaresolverr 配置
-# 优先读取环境变量，默认使用 docker-compose 内部服务名
 FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://flaresolverr:8191/v1")
 # 远程 Selenium 配置
 REMOTE_SELENIUM_URL = os.getenv("REMOTE_SELENIUM_URL", None)
@@ -24,169 +21,68 @@ class SeleniumBrowser:
     def __init__(self, base_url=None):
         self.base_url = base_url
         self.driver = None
-        self.sb_context = None
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     async def init_browser(self):
         await asyncio.get_running_loop().run_in_executor(self.executor, self._init_driver)
 
     def _init_driver(self):
-        # 保留 sehua 目录 (用于存放持久化数据)，删除其他所有内容
+        if not REMOTE_SELENIUM_URL:
+            init.logger.error("未配置 REMOTE_SELENIUM_URL，无法初始化浏览器")
+            return
+
         try:
-            if os.path.exists(init.TEMP):
-                init.logger.info(f"正在清理临时目录: {init.TEMP}")
-                subprocess.run(
-                    f"rm -rf {os.path.join(init.TEMP, 'chrome_user_data')}", 
-                    shell=True, 
-                    stderr=subprocess.DEVNULL
-                )
-        except Exception as e:
-            init.logger.warn(f"清理临时目录失败: {e}")
-        # 0. 优先尝试远程 WebDriver (如果配置了)
-        if REMOTE_SELENIUM_URL:
-            try:
-                init.logger.info(f"正在连接远程 Selenium: {REMOTE_SELENIUM_URL} ...")
-                options = webdriver.ChromeOptions()
-                options.add_argument('--no-sandbox')
-                options.add_argument('--disable-dev-shm-usage')
-                options.add_argument(f'user-agent={init.USER_AGENT}')
-                
-                self.driver = webdriver.Remote(
-                    command_executor=REMOTE_SELENIUM_URL,
-                    options=options
-                )
-                
-                if self.base_url:
-                    if not self.base_url.startswith('http'):
-                        self.base_url = f"https://{self.base_url}"
-                    self.driver.set_page_load_timeout(init.bot_config.get("selenium_timeout", 60))
-                    self.driver.get(self.base_url)
-                    
-                init.logger.info("远程 Selenium 连接成功")
-                return
-            except Exception as e:
-                init.logger.error(f"远程 Selenium 连接失败: {e}")
-                # 如果远程连接失败，继续尝试本地初始化作为 fallback
-                pass
+            init.logger.info(f"正在连接远程 Selenium: {REMOTE_SELENIUM_URL} ...")
+            options = webdriver.ChromeOptions()
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument(f'user-agent={init.USER_AGENT}')
 
-        # 基础参数
-        # 针对 Chrome 143+ 的本地初始化修复:
-        # 1. 显式指定调试端口
-        # 2. 显式指定用户数据目录，防止权限问题
-        user_data_dir = os.path.join(init.TEMP, "chrome_user_data")
-        base_args = f"--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-blink-features=AutomationControlled --disable-infobars --remote-debugging-port=9222 --user-data-dir={user_data_dir}"
+            self.driver = webdriver.Remote(
+                command_executor=REMOTE_SELENIUM_URL,
+                options=options
+            )
 
-        # 尝试列表: 
-        # 1. headless2=True (新版无头)
-        # 2. headless=True (旧版无头)
-        modes = [
-            {"headless2": True, "name": "uc_headless_new"},
-            {"headless": True, "name": "uc_headless_legacy"},
-        ]
-
-        for mode in modes:
-            try:
-                mode_name = mode.pop("name")
-                init.logger.info(f"正在初始化 SeleniumBase 浏览器 (模式: {mode_name})...")
-                
-                # 构造配置
-                config = {
-                    "uc": True,
-                    "agent": init.USER_AGENT,
-                    "chromium_arg": base_args
-                }
-                config.update(mode)
-                
-                self.sb_context = SB(**config)
-                self.sb = self.sb_context.__enter__()
-                self.driver = self.sb.driver 
-                
-                # 额外的反检测脚本 (仅在 driver 成功初始化后执行)
-                try:
-                    self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-                        "source": """
-                            Object.defineProperty(navigator, 'webdriver', {
-                                get: () => undefined
-                            });
-                        """
-                    })
-                except:
-                    pass
-
+            if self.base_url:
+                if not self.base_url.startswith('http'):
+                    self.base_url = f"https://{self.base_url}"
                 self.driver.set_page_load_timeout(init.bot_config.get("selenium_timeout", 60))
+                self.driver.get(self.base_url)
 
-                if self.base_url:
-                    if not self.base_url.startswith('http'):
-                        self.base_url = f"https://{self.base_url}"
-                    self.driver.get(self.base_url)
-                
-                init.logger.info(f"SeleniumBase 浏览器初始化成功 (模式: {mode_name})")
-                return # 初始化成功，直接返回
-
-            except Exception as e:
-                init.logger.warn(f"SeleniumBase 初始化失败 (模式: {mode_name}): {e}")
-                # 清理可能部分初始化的资源
-                try:
-                    if self.sb_context:
-                        self.sb_context.__exit__(None, None, None)
-                except:
-                    pass
-                self.sb_context = None
-                self.driver = None
-                # 继续下一次循环尝试
-
-        init.logger.error("SeleniumBase 浏览器所有模式初始化均失败")
+            init.logger.info("远程 Selenium 连接成功")
+        except Exception as e:
+            init.logger.error(f"远程 Selenium 连接失败: {e}")
 
     async def close(self):
         try:
             init.logger.info("正在关闭浏览器并清理环境...")
-            
-            def _close_sync():
-                # 1. 优先使用 SeleniumBase Context 退出
-                if self.sb_context:
-                    try:
-                        self.sb_context.__exit__(None, None, None)
-                    except Exception as e:
-                        init.logger.warn(f"SeleniumBase Context 退出异常: {e}")
 
-                # 2. 如果 driver 还在 (例如远程模式，或者 context 退出失败)，尝试手动 quit
+            def _close_sync():
                 if self.driver:
                     try:
                         self.driver.quit()
                     except Exception as e:
-                        # 忽略 session id 相关的错误，因为可能已经被 close 了
                         if "invalid session id" not in str(e).lower():
-                             init.logger.warn(f"Driver quit 异常: {e}")
-                
-                # 3. 尝试回收可能的僵尸进程 (Linux)
+                            init.logger.warn(f"Driver quit 异常: {e}")
+
                 if hasattr(os, 'waitpid'):
                     try:
                         while True:
-                            # 尝试非阻塞等待任意子进程结束
                             pid, status = os.waitpid(-1, os.WNOHANG)
-                            if pid == 0:  # 没有更多已结束的子进程
+                            if pid == 0:
                                 break
                     except OSError:
                         pass
                     except Exception:
                         pass
 
-            # 使用 executor 执行同步的清理操作
-            await asyncio.get_running_loop().run_in_executor(
-                self.executor, 
-                _close_sync
-            )
-            
-            # 关闭线程池
+            await asyncio.get_running_loop().run_in_executor(self.executor, _close_sync)
             self.executor.shutdown(wait=True)
-            
             init.logger.info("浏览器清理完成")
         except Exception as e:
             init.logger.error(f"关闭浏览器时发生错误: {e}")
         finally:
-            # 确保引用被重置，防止重入
             self.driver = None
-            self.sb_context = None
 
     async def goto(self, url):
         await asyncio.get_running_loop().run_in_executor(self.executor, self._goto_sync, url)
@@ -220,7 +116,6 @@ class SeleniumBrowser:
     def _click_text_sync(self, text):
         if not self.driver: return
         try:
-            # Try xpath
             elem = self.driver.find_element(By.XPATH, f"//*[contains(text(), '{text}')]")
             elem.click()
             time.sleep(2)
@@ -244,46 +139,39 @@ class SeleniumBrowser:
             return
 
         try:
-            # 1. 检查是否是 Cloudflare 页面
             title = self.driver.title
             if not title or not any(x in title for x in ["Just a moment", "Cloudflare", "请稍候", "安全检查"]):
                 return
 
             init.logger.info(f"检测到 Cloudflare 验证 ({title})，尝试使用 Flaresolverr 处理...")
-            
-            # 获取当前URL
             current_url = self.driver.current_url
             if not current_url:
                 return
 
-            # 2. 调用 Flaresolverr
-            # 群晖等低功耗设备上 Flaresolverr 处理可能较慢，增加超时时间到 2 分钟
             payload = {
                 "cmd": "request.get",
                 "url": current_url,
                 "maxTimeout": 120000
             }
             headers = {"Content-Type": "application/json"}
-            
+
             init.logger.info(f"请求 Flaresolverr: {FLARESOLVERR_URL}")
             response = requests.post(FLARESOLVERR_URL, json=payload, headers=headers, timeout=125)
             resp_data = response.json()
-            
+
             if resp_data.get("status") == "ok":
                 init.logger.info("Flaresolverr 验证成功，正在同步 Cookies...")
                 solution = resp_data.get("solution", {})
                 cookies = solution.get("cookies", [])
                 user_agent = solution.get("userAgent")
 
-                # 3. 同步 User-Agent (关键)
                 if user_agent:
                     init.logger.info(f"同步 Flaresolverr User-Agent: {user_agent[:50]}...")
                     try:
                         self.driver.execute_cdp_cmd("Network.setUserAgentOverride", {"userAgent": user_agent})
                     except Exception as e:
                         init.logger.warn(f"设置 User-Agent 失败: {e}")
-                
-                # 4. 同步 Cookies
+
                 if cookies:
                     self.driver.delete_all_cookies()
                     for cookie in cookies:
@@ -297,17 +185,16 @@ class SeleniumBrowser:
                         if 'secure' in cookie: cookie_dict['secure'] = cookie['secure']
                         if 'httpOnly' in cookie: cookie_dict['httpOnly'] = cookie['httpOnly']
                         if 'sameSite' in cookie: cookie_dict['sameSite'] = cookie['sameSite']
-                            
+
                         try:
                             self.driver.add_cookie(cookie_dict)
-                        except Exception as e:
-                            pass # 忽略个别 cookie 错误
-                    
+                        except Exception:
+                            pass
+
                     init.logger.info(f"成功同步 {len(cookies)} 个 Cookies，刷新页面...")
                     self.driver.refresh()
                     time.sleep(5)
-                    
-                    # 再次检查
+
                     title = self.driver.title
                     if any(x in title for x in ["Just a moment", "Cloudflare", "请稍候", "安全检查"]):
                         init.logger.warn("同步 Cookie 后依然显示 Cloudflare 验证页")
@@ -320,5 +207,4 @@ class SeleniumBrowser:
             init.logger.warn(f"Cloudflare 验证处理出错: {e}")
 
     async def run_with_driver(self, func, *args):
-        """在 executor 中运行同步函数，并将 driver 作为第一个参数传入"""
         return await asyncio.get_running_loop().run_in_executor(self.executor, func, self.driver, *args)

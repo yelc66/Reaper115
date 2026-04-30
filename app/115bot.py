@@ -17,6 +17,7 @@ from app.handlers.video_handler import register_video_handlers
 from app.core.scheduler import start_scheduler_in_thread
 from app.handlers.offline_task_handler import register_offline_task_handlers
 from app.handlers.crawl_handler import register_crawl_handlers
+from app.handlers.auth_115_handler import register_auth_115_handlers
 from app.web.server import start_web_server_in_thread
 
 
@@ -34,8 +35,9 @@ def get_help_info():
 <code>/start</code> - 显示帮助信息\n
 <code>/reload</code> - <i>重载配置</i>\n
 <code>/rl</code> - 查看重试列表\n
-<code>/csh</code> - <i>手动爬取涩花数据</i>\n
-<code>/sync</code> - 同步目录并创建软链\n
+<code>/csh_yesterday</code> - 爬取昨日涩花\n
+<code>/csh_today</code> - 爬取今日涩花\n
+<code>/csh_7days</code> - 爬取近七天涩花\n
 <code>/q</code> - 取消当前会话\n\n
 <b>✨ 功能说明</b>\n
 <u>磁力/离线下载：</u>
@@ -45,11 +47,8 @@ def get_help_info():
 • 输入 <code>"/rl"</code>
 • 查看当前重试列表，可根据需要选择是否清空\n
 <u>手动爬取涩花：</u>
-• 输入 <code>"/csh [yyyymmdd]"</code>
-• 基于版块配置，爬取涩花数据，留空则爬取昨日\n
-<u>目录同步：</u>
-• 输入 <code>"/sync"</code>
-• 选择目录后查看其中视频文件列表\n
+• 常用：<code>/csh_yesterday</code>、<code>/csh_today</code>、<code>/csh_7days</code>
+• 如需指定日期，仍可手动输入 <code>/csh 20260430</code>\n
 <u>视频转存：</u>
 • 直接转发视频给机器人，选择保存目录即可保存到115
 """
@@ -117,12 +116,14 @@ def update_logger_level():
     
 def get_bot_menu():
     return [
-        BotCommand("start", "获取帮助信息"),
+        BotCommand("start", "帮助信息"),
         BotCommand("reload", "重载配置"),
-        BotCommand("rl", "查看重试列表"),
-        BotCommand("csh", "手动爬取涩花数据"),
-        BotCommand("sync", "同步指定目录，并创建软链"),
-        BotCommand("q", "退出当前会话")]
+        BotCommand("rl", "重试列表"),
+        BotCommand("csh_yesterday", "抓取昨日涩花"),
+        BotCommand("csh_today", "抓取今日涩花"),
+        BotCommand("csh_7days", "抓取近七天涩花"),
+        BotCommand("auth", "115扫码重新授权"),
+        BotCommand("q", "取消当前会话")]
     
 
 async def set_bot_menu(application):
@@ -191,6 +192,8 @@ if __name__ == '__main__':
     register_offline_task_handlers(application)
     # 手动爬虫
     register_crawl_handlers(application)
+    # 115扫码授权
+    register_auth_115_handlers(application)
     # 注册视频
     register_video_handlers(application)
     

@@ -195,6 +195,82 @@ class OpenAPI_115:
                             break
               
                         
+    def auth_pkce_get_qr(self, app_id: str) -> dict:
+        """发起PKCE授权，返回二维码base64图片及轮询所需参数，供Web UI调用"""
+        import io
+        header = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": init.USER_AGENT,
+        }
+        verifier, challenge = self.get_challenge()
+        data = {
+            "client_id": app_id,
+            "code_challenge": challenge,
+            "code_challenge_method": "sha256",
+        }
+        response = requests.post("https://passportapi.115.com/open/authDeviceCode", headers=header, data=data)
+        res = response.json()
+        if response.status_code != 200:
+            raise Exception(f"获取二维码失败: {response.status_code} - {response.text}")
+
+        uid = res["data"]["uid"]
+        check_time = res["data"]["time"]
+        qr_data = res["data"]["qrcode"]
+        sign = res["data"]["sign"]
+
+        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        return {
+            "qr_b64": qr_b64,
+            "uid": uid,
+            "time": check_time,
+            "sign": sign,
+            "verifier": verifier,
+            "app_id": app_id,
+        }
+
+    def auth_pkce_poll(self, uid: str, check_time: int, sign: str, verifier: str, app_id: str) -> dict:
+        """轮询一次二维码扫码状态，返回 {status, done, message}，供Web UI SSE逐步调用"""
+        params = {"uid": uid, "time": check_time, "sign": sign}
+        response = requests.get("https://qrcodeapi.115.com/get/status/", params=params, timeout=10)
+        if response.status_code != 200:
+            return {"status": "error", "done": True, "message": f"轮询失败: {response.status_code}"}
+
+        res = response.json()
+        if res["state"] == 0:
+            return {"status": "expired", "done": True, "message": "二维码已失效"}
+
+        scan_status = res["data"].get("status") if res.get("data") else None
+        if scan_status is None:
+            return {"status": "waiting", "done": False, "message": "等待扫码..."}
+        if scan_status == 1:
+            return {"status": "scanned", "done": False, "message": "已扫码，等待确认..."}
+        if scan_status == 2:
+            header = {"Content-Type": "application/x-www-form-urlencoded", "User-Agent": init.USER_AGENT}
+            r = requests.post(
+                "https://passportapi.115.com/open/deviceCodeToToken",
+                headers=header,
+                data={"uid": uid, "code_verifier": verifier},
+                timeout=10,
+            )
+            r_data = r.json()
+            if r.status_code == 200 and "data" in r_data:
+                access_token = r_data["data"]["access_token"]
+                refresh_token = r_data["data"]["refresh_token"]
+                self.access_token = access_token
+                self.refresh_token = refresh_token
+                self.save_token_to_file(access_token, refresh_token, init.TOKEN_FILE)
+                return {"status": "success", "done": True, "message": "授权成功！"}
+            return {"status": "error", "done": True, "message": "获取token失败"}
+
+        return {"status": "waiting", "done": False, "message": "等待扫码..."}
+
     def _load_token_from_file(self):
         if os.path.exists(init.TOKEN_FILE):
             try:

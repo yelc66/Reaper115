@@ -44,6 +44,11 @@ type CrawlTriggerPayload = {
   mode?: "today" | "yesterday" | "7days";
 };
 
+export const authApi = {
+  status: async () => (await api.get<{ auth_required: boolean }>("/api/auth/status")).data,
+  login: async (key: string) => (await api.post<{ ok: boolean; auth_required: boolean }>("/api/auth/login", { key })).data,
+};
+
 export const dashboardApi = {
   stats: async () => mapDashboardStats((await api.get<DashboardStatsDto>("/api/dashboard/stats")).data),
   trend: async (days = 30): Promise<TrendResponse> =>
@@ -67,6 +72,7 @@ export const sehuaApi = {
   download: async (id: number) => (await api.post(`/api/sehua/${id}/download`)).data,
   batchDownload: async (ids: number[]) => (await api.post("/api/sehua/batch-download", { ids })).data,
   delete: async (id: number) => (await api.delete(`/api/sehua/${id}`)).data,
+  batchDelete: async (ids: number[]) => (await api.delete("/api/sehua/batch-delete", { data: { ids } })).data,
 };
 
 export const strategyApi = {
@@ -111,4 +117,5 @@ export const systemApi = {
   updateConfig: async (config: Record<string, unknown>) => (await api.put("/api/system/config", { config })).data,
   testTelegram: async () => (await api.post<{ ok: boolean; message: string }>("/api/system/test/telegram")).data,
   test115: async () => (await api.post<{ ok: boolean; message: string }>("/api/system/test/115")).data,
+  get115Qrcode: async () => (await api.get<{ ok: boolean; qr_b64: string }>("/api/system/115/qrcode")).data,
 };

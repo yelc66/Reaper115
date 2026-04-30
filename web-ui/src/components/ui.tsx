@@ -25,12 +25,13 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80",
+        "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40",
+        variant === "primary" &&
+          "bg-primary text-primary-foreground shadow-[0_12px_28px_rgba(0,122,255,0.28)] hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_16px_36px_rgba(0,122,255,0.34)] active:translate-y-0 active:bg-primary/80",
         variant === "secondary" &&
-          "border border-border bg-surface-elevated text-foreground hover:bg-surface-elevated/80",
+          "border border-white/70 bg-white/58 text-foreground shadow-panel backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/72",
         variant === "ghost" &&
-          "border border-transparent bg-transparent text-muted-foreground hover:bg-surface-elevated hover:text-foreground",
+          "border border-transparent bg-transparent text-muted-foreground hover:bg-white/46 hover:text-foreground",
         variant === "danger" && "border border-destructive/20 bg-destructive/10 text-red-400 hover:bg-destructive/20",
         size === "sm" && "h-7 px-2.5 text-xs",
         size === "md" && "h-8 px-3.5",
@@ -48,7 +49,12 @@ export function Button({
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("rounded-lg border border-border bg-surface p-4 shadow-panel", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-white/70 bg-white/62 p-4 shadow-panel backdrop-blur-2xl dark:border-white/10 dark:bg-white/10",
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -78,7 +84,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        "h-8 w-full rounded-md border border-border bg-surface-elevated px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
+        "h-8 w-full rounded-md border border-white/70 bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
         className,
       )}
       {...props}
@@ -90,7 +96,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "h-8 w-full rounded-md border border-border bg-surface-elevated px-3 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
+        "h-8 w-full rounded-md border border-white/70 bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
         className,
       )}
       {...props}
@@ -102,7 +108,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "min-h-28 w-full rounded-md border border-border bg-surface-elevated px-3 py-2 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
+        "min-h-28 w-full rounded-md border border-white/70 bg-white/62 px-3 py-2 font-mono text-sm text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
         className,
       )}
       {...props}
@@ -121,7 +127,7 @@ export function Badge({
     <span
       className={cn(
         "inline-flex h-5 items-center rounded px-1.5 text-xs font-medium tracking-wide",
-        tone === "default" && "bg-surface-elevated text-muted-foreground",
+        tone === "default" && "bg-white/54 text-muted-foreground backdrop-blur-xl",
         tone === "success" && "bg-emerald-500/12 text-emerald-400",
         tone === "warning" && "bg-amber-500/12 text-amber-400",
         tone === "danger" && "bg-rose-500/12 text-rose-400",

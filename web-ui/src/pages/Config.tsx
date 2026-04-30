@@ -1,15 +1,17 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { KeyRound, RefreshCw, Save } from "lucide-react";
 
+import { API_BASE_URL } from "../api/client";
 import { systemApi } from "../api/queries";
-import { Button, Card, ErrorState, Input, LoadingState, PageHeader, Select } from "../components/ui";
+import { Badge, Button, Card, ErrorState, Input, LoadingState, PageHeader, Select } from "../components/ui";
 import { cn, errorMessage } from "../lib/utils";
 
 type FormState = {
   logLevel: string;
   webEnabled: boolean;
   webPort: string;
+  webAuthKey: string;
   botToken: string;
   allowedUser: string;
   appId: string;
@@ -31,6 +33,7 @@ function toFormState(config: Record<string, unknown>): FormState {
     logLevel: (config.log_level as string) || "info",
     webEnabled: webConfig.enable !== false,
     webPort: String(webConfig.port ?? 8000),
+    webAuthKey: (webConfig.auth_key as string) || "",
     botToken: (config.bot_token as string) || "",
     allowedUser: String(config.allowed_user ?? ""),
     appId: (config["115_app_id"] as string) || "",
@@ -52,6 +55,7 @@ function toApiConfig(formState: FormState, original: Record<string, unknown>): R
       ...((original.web as object) || {}),
       enable: formState.webEnabled,
       port: Number(formState.webPort),
+      auth_key: formState.webAuthKey,
     },
     bot_token: formState.botToken,
     allowed_user: formState.allowedUser,
@@ -164,6 +168,14 @@ export function Config() {
               onCheckedChange={(checked) => patchForm("webEnabled", checked)}
             />
           </Row>
+          <Row label="Web 认证密钥" hint="留空表示不启用登录认证；WEB_AUTH_KEY 环境变量优先">
+            <Input
+              type="password"
+              value={formState.webAuthKey}
+              onChange={(event) => patchForm("webAuthKey", event.target.value)}
+              placeholder="留空不启用"
+            />
+          </Row>
           <Row label="开启广告清理">
             <Switch
               checked={formState.cleanEnabled}
@@ -201,7 +213,7 @@ export function Config() {
         </Section>
 
         {/* 115 开放平台 — 独立保存 */}
-        <Section title="115 开放平台" hint="App ID 与 Token 二选一，填 App ID 时 Token 可留空" onSave={() => saveSection(api115Save)} saveState={api115Save}>
+        <Section title="115 开放平台" hint="填写 App ID 后点击「扫码授权」完成首次授权，Token 会自动写入" onSave={() => saveSection(api115Save)} saveState={api115Save}>
           <Row label="App ID">
             <Input
               value={formState.appId}
@@ -209,22 +221,30 @@ export function Config() {
               placeholder="your_115_app_id"
             />
           </Row>
-          <Row label="Access Token">
-            <Input
-              type="password"
-              value={formState.accessToken}
-              onChange={(event) => patchForm("accessToken", event.target.value)}
-              placeholder="your_access_token"
-            />
-          </Row>
-          <Row label="Refresh Token">
-            <Input
-              type="password"
-              value={formState.refreshToken}
-              onChange={(event) => patchForm("refreshToken", event.target.value)}
-              placeholder="your_refresh_token"
-            />
-          </Row>
+          {formState.appId && formState.appId !== "your_115_app_id" ? (
+            <Row label="扫码授权" hint="首次授权或 Token 过期时使用">
+              <QrcodeAuth />
+            </Row>
+          ) : (
+            <>
+              <Row label="Access Token">
+                <Input
+                  type="password"
+                  value={formState.accessToken}
+                  onChange={(event) => patchForm("accessToken", event.target.value)}
+                  placeholder="your_access_token"
+                />
+              </Row>
+              <Row label="Refresh Token">
+                <Input
+                  type="password"
+                  value={formState.refreshToken}
+                  onChange={(event) => patchForm("refreshToken", event.target.value)}
+                  placeholder="your_refresh_token"
+                />
+              </Row>
+            </>
+          )}
         </Section>
 
 
@@ -308,6 +328,90 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
         {hint ? <p className="mt-1 text-xs leading-snug text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="flex flex-1 items-center">{children}</div>
+    </div>
+  );
+}
+
+type QrStatus = "idle" | "loading" | "ready" | "waiting" | "scanned" | "success" | "expired" | "error";
+type PollResult = { status: string; done: boolean; message: string };
+
+const QR_TONE: Record<string, "success" | "warning" | "danger" | "default"> = {
+  ready: "default", waiting: "default", scanned: "warning",
+  success: "success", expired: "danger", error: "danger",
+};
+const QR_LABEL: Record<string, string> = {
+  idle: "", loading: "获取中...", ready: "请用115 APP扫码",
+  waiting: "等待扫码...", scanned: "已扫码，等待确认...",
+  success: "授权成功！", expired: "二维码已过期", error: "出错了",
+};
+
+function QrcodeAuth() {
+  const [qrB64, setQrB64] = useState<string | null>(null);
+  const [status, setStatus] = useState<QrStatus>("idle");
+  const [message, setMessage] = useState("");
+  const sseRef = useRef<EventSource | null>(null);
+
+  function stopSSE() {
+    sseRef.current?.close();
+    sseRef.current = null;
+  }
+
+  async function startAuth() {
+    stopSSE();
+    setStatus("loading");
+    setQrB64(null);
+    setMessage("");
+    try {
+      const res = await systemApi.get115Qrcode();
+      setQrB64(res.qr_b64);
+      setStatus("ready");
+    } catch (e: unknown) {
+      setStatus("error");
+      setMessage(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    const sse = new EventSource(`${API_BASE_URL}/api/system/115/qrcode/status`);
+    sseRef.current = sse;
+    sse.onmessage = (event) => {
+      const result = JSON.parse(event.data) as PollResult;
+      setStatus(result.status as QrStatus);
+      setMessage(result.message);
+      if (result.done) { sse.close(); sseRef.current = null; }
+    };
+    sse.onerror = () => {
+      setStatus("error"); setMessage("连接中断");
+      sse.close(); sseRef.current = null;
+    };
+  }
+
+  useEffect(() => () => stopSSE(), []);
+
+  const isPolling = status === "ready" || status === "waiting" || status === "scanned";
+  const isDone = status === "success" || status === "expired" || status === "error";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="secondary" onClick={startAuth} loading={status === "loading"} disabled={isPolling}>
+          <RefreshCw className="h-3.5 w-3.5" />
+          {isDone || status === "idle" ? "获取二维码" : "授权中..."}
+        </Button>
+        {status !== "idle" && (
+          <Badge tone={QR_TONE[status] ?? "default"}>
+            <KeyRound className="mr-1 h-3 w-3" />
+            {QR_LABEL[status] ?? status}
+          </Badge>
+        )}
+      </div>
+      {qrB64 && (
+        <img src={`data:image/png;base64,${qrB64}`} alt="115授权二维码"
+          className="h-40 w-40 rounded-lg border border-white/30 shadow" />
+      )}
+      {message && status !== "idle" && (
+        <p className={cn("text-xs", status === "success" ? "text-emerald-400" : status === "error" || status === "expired" ? "text-rose-400" : "text-muted-foreground")}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

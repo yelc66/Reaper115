@@ -306,12 +306,18 @@ def init_db():
             pub_url TEXT, -- 资源链接
             image_path TEXT, -- 图片本地路径 
             save_path TEXT, -- 保存路径
-            is_download TINYINT DEFAULT 0, -- 是否下载, 0或1, 默认0
+            is_download TINYINT DEFAULT 0, -- 0=未提交 1=已提交离线 2=115下载完成+后处理完成
+            submitted_at DATETIME, -- 提交离线时间
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP -- 创建时间，默认当前时间
         );
         '''
         sqlite.execute_sql(create_table_query)
-        
+        # 兼容旧表：补充新字段（字段已存在时忽略错误）
+        try:
+            sqlite.execute_sql("ALTER TABLE sehua_data ADD COLUMN submitted_at DATETIME")
+        except Exception:
+            pass
+
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS t66y (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

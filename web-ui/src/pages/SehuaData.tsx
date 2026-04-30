@@ -31,6 +31,13 @@ export function SehuaData() {
     },
   });
   const removeMutation = useMutation({ mutationFn: sehuaApi.delete, onSuccess: invalidateSehuaQueries });
+  const batchDeleteMutation = useMutation({
+    mutationFn: sehuaApi.batchDelete,
+    onSuccess: () => {
+      setSelectedIds([]);
+      invalidateSehuaQueries();
+    },
+  });
 
   const totalPages = Math.max(1, Math.ceil((sehuaQuery.data?.total ?? 0) / PAGE_SIZE));
   const sections = useMemo(
@@ -44,14 +51,25 @@ export function SehuaData() {
         title="涩花数据"
         description="筛选已抓取资源，提交单条或批量离线任务"
         actions={
-          <Button
-            loading={batchDownloadMutation.isPending}
-            disabled={selectedIds.length === 0}
-            onClick={() => batchDownloadMutation.mutate(selectedIds)}
-          >
-            <Download className="h-4 w-4" />
-            批量离线
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              loading={batchDeleteMutation.isPending}
+              disabled={selectedIds.length === 0}
+              onClick={() => batchDeleteMutation.mutate(selectedIds)}
+            >
+              <Trash2 className="h-4 w-4" />
+              批量删除
+            </Button>
+            <Button
+              loading={batchDownloadMutation.isPending}
+              disabled={selectedIds.length === 0}
+              onClick={() => batchDownloadMutation.mutate(selectedIds)}
+            >
+              <Download className="h-4 w-4" />
+              批量离线
+            </Button>
+          </div>
         }
       />
       <Card className="mb-4">

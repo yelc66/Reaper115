@@ -38,7 +38,7 @@ A Python-based Telegram bot focused on sehua content crawling and 115 Network Di
 
 1. **Clone and configure**
    ```bash
-   git clone https://github.com/qiqiandfei/Telegram-115bot.git
+   git clone https://github.com/yelc668/Telegram-115bot.git
    cd Telegram-115bot
    mkdir -p config tmp
    cp app/config.yaml.example config/config.yaml
@@ -58,7 +58,7 @@ A Python-based Telegram bot focused on sehua content crawling and 115 Network Di
 
 3. **Build locally** (optional)
    ```bash
-   docker build -t 115bot:latest .
+   docker build -t reaper115-bot:latest .
    docker compose up -d
    ```
 
@@ -116,9 +116,13 @@ Set `HTTP_PROXY` / `HTTPS_PROXY` env vars in `docker-compose.yaml` if needed.
 |----------------|--------------------------------------|
 | `/start`       | Show help                            |
 | `/reload`      | Reload configuration from disk       |
-| `/csh [date]`  | Manually trigger sehua crawl         |
+| `/rl`          | Show offline retry list              |
+| `/csh_yesterday` | Crawl yesterday's sehua data       |
+| `/csh_today`   | Crawl today's sehua data             |
+| `/csh_7days`   | Crawl recent 7 days of sehua data    |
+| `/q`           | Cancel current conversation          |
 
-`/csh` accepts an optional date in `YYYY-MM-DD` format; defaults to yesterday.
+Custom sehua crawls are still available by manually sending `/csh YYYYMMDD`.
 
 ## Directory Structure
 

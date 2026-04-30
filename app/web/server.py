@@ -1,19 +1,50 @@
 # -*- coding: utf-8 -*-
 
 import os
+import secrets
 import threading
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 import init
 from app.web.routers import crawl, dashboard, sehua, strategy, system, tasks
 from app.web.utils import install_log_buffer
 
 _DIST_DIR = os.path.join(os.path.dirname(__file__), "dist")
+_AUTH_EXEMPT_PATHS = {
+    "/api/health",
+    "/api/auth/status",
+    "/api/auth/login",
+}
+
+
+class LoginRequest(BaseModel):
+    key: str = ""
+
+
+def _get_auth_key() -> str:
+    env_key = os.getenv("WEB_AUTH_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    web_config = init.bot_config.get("web", {}) or {}
+    return str(web_config.get("auth_key", "") or "").strip()
+
+
+def _auth_required() -> bool:
+    return bool(_get_auth_key())
+
+
+def _is_authorized(candidate: str | None) -> bool:
+    auth_key = _get_auth_key()
+    if not auth_key:
+        return True
+    return secrets.compare_digest(candidate or "", auth_key)
 
 
 def create_app():
@@ -26,6 +57,28 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def require_web_auth(request: Request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        path = request.url.path.rstrip("/") or "/"
+        if path.startswith("/api/") and path not in _AUTH_EXEMPT_PATHS:
+            if not _is_authorized(request.headers.get("x-web-auth-key")):
+                return JSONResponse({"detail": "Web UI authentication required"}, status_code=401)
+
+        return await call_next(request)
+
+    @app.get("/api/auth/status")
+    def auth_status():
+        return {"auth_required": _auth_required()}
+
+    @app.post("/api/auth/login")
+    def auth_login(payload: LoginRequest):
+        if not _is_authorized(payload.key):
+            raise HTTPException(status_code=401, detail="认证密钥不正确")
+        return {"ok": True, "auth_required": _auth_required()}
 
     app.include_router(dashboard.router)
     app.include_router(sehua.router)

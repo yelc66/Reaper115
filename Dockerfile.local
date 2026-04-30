@@ -1,5 +1,5 @@
-FROM 115bot:base
-LABEL authors="qiqiandfei"
+FROM reaper115-bot:base
+LABEL authors="yelc668"
 
 # 设置工作目录
 WORKDIR /app
