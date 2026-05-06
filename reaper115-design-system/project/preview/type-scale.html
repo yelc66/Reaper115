@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>Type scale</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  body { align-items: flex-start; }
+  .stack { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+  .row { display: grid; grid-template-columns: 110px 1fr 110px; align-items: baseline; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(28,28,30,0.08); }
+  .row:last-child { border-bottom: none; }
+  .lbl { font-size: 11px; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); }
+  .meta { font-size: 11px; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); text-align: right; }
+  .display { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+  .h1      { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .h2      { font-size: 16px; font-weight: 600; }
+  .body    { font-size: 14px; font-weight: 400; }
+  .cap     { font-size: 12px; font-weight: 400; color: hsl(var(--muted-foreground)); }
+  .mono    { font-size: 13px; font-family: var(--font-mono); }
+</style></head>
+<body><div class="card-stage"><div class="stack">
+  <div class="row"><span class="lbl">Display</span><span class="display">Reaper115</span><span class="meta">28 / 600</span></div>
+  <div class="row"><span class="lbl">Page H1</span><span class="h1">爬虫配置</span><span class="meta">20 / 600</span></div>
+  <div class="row"><span class="lbl">Section H2</span><span class="h2">运行状态</span><span class="meta">16 / 600</span></div>
+  <div class="row"><span class="lbl">Body</span><span class="body">资源入库、离线状态和最近抓取活动概览</span><span class="meta">14 / 400</span></div>
+  <div class="row"><span class="lbl">Caption</span><span class="cap">24h 格式，每日定时爬取前一天数据</span><span class="meta">12 / 400</span></div>
+  <div class="row"><span class="lbl">Mono</span><span class="mono">/AV/涩花/无码字幕</span><span class="meta">13 / 400</span></div>
+</div></div></body></html>

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Calendar, Play, Square } from "lucide-react";
+import { Play, Square } from "lucide-react";
 
 import { API_BASE_URL, getStoredAuthKey } from "../api/client";
 import { crawlApi } from "../api/queries";
-import { Badge, Button, Card, ErrorState, Field, Input, PageHeader } from "../components/ui";
+import { Badge, Button, Card, ErrorState, PageHeader } from "../components/ui";
 import { errorMessage } from "../lib/utils";
 
 type LogItem = { time: string; level: string; message: string };
@@ -13,15 +13,12 @@ const PRESETS = [
   { id: "today",     label: "今天" },
   { id: "yesterday", label: "昨天" },
   { id: "7days",     label: "近 7 天" },
-  { id: "custom",    label: "自定义" },
 ] as const;
 
 type PresetId = (typeof PRESETS)[number]["id"];
 
 export function Crawl() {
   const [preset, setPreset] = useState<PresetId>("today");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
   const [logs, setLogs] = useState<LogItem[]>([]);
   const logRef = useRef<HTMLDivElement | null>(null);
 
@@ -55,18 +52,14 @@ export function Crawl() {
   const running = statusQuery.data?.running ?? false;
 
   function handleRun() {
-    if (preset === "custom") {
-      triggerMutation.mutate(customFrom || undefined);
-    } else {
-      triggerMutation.mutate({ mode: preset as "today" | "yesterday" | "7days" });
-    }
+    triggerMutation.mutate({ mode: preset });
   }
 
   return (
     <>
       <PageHeader
         title="手动抓取"
-        description="按指定时间范围触发一次抓取，日期基于来源帖子的发布时间。"
+        description="按预设时间范围触发一次抓取，日期基于来源帖子的发布时间。"
         actions={
           running ? (
             <Button variant="danger" size="sm" disabled>
@@ -105,26 +98,6 @@ export function Crawl() {
             </button>
           ))}
         </div>
-        {preset === "custom" && (
-          <div className="mt-4 flex flex-wrap gap-4">
-            <Field label="开始日期" icon={<Calendar />}>
-              <Input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="w-40"
-              />
-            </Field>
-            <Field label="结束日期" icon={<Calendar />}>
-              <Input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="w-40"
-              />
-            </Field>
-          </div>
-        )}
         {triggerMutation.isError ? (
           <div className="mt-3">
             <ErrorState message={errorMessage(triggerMutation.error)} />

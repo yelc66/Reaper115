@@ -1,0 +1,218 @@
+/* ============================================================================
+   Reaper115 Design System — colors_and_type.css
+   iOS 26 / Liquid Glass • 涩花 + 115 离线下载 + Telegram 管理控制台
+   Mirrors web-ui/src/styles.css and the design-delivery brand pack.
+   ============================================================================ */
+
+:root {
+  /* ── Brand colors ── */
+  --r115-primary:    #007AFF;   /* iOS system blue   */
+  --r115-cyan:       #5ACBFA;   /* gradient + telegram accent */
+  --r115-sky:        #B0D9FF;   /* icon highlights   */
+  --r115-mist:       #E5F2FF;   /* app icon + page wash */
+  --r115-white:      #FFFFFF;
+  --r115-ink:        #1C1C1E;   /* primary text + shadow ink */
+  --r115-slate:      #8E8E93;   /* secondary text    */
+
+  /* ── Apple system semantic accents ── */
+  --r115-success:    #34C759;
+  --r115-warning:    #FF9500;
+  --r115-destructive:#FF3B30;
+  --r115-violet:     #5856D6;
+
+  /* ── HSL semantic tokens (mirrored from web-ui/src/styles.css) ── */
+  --background:        210 67% 97%;
+  --surface:             0  0% 100%;
+  --surface-elevated:  207 100% 96%;
+  --border:            209  54% 86%;
+  --muted:             207 100% 95%;
+  --muted-foreground:  216  12% 48%;
+  --foreground:        240   3% 11%;
+  --primary:           211 100% 50%;
+  --primary-foreground: 0   0% 100%;
+  --destructive:         0  65% 60%;
+  --success:           158  52% 48%;
+  --warning:            38  92% 54%;
+
+  /* ── Glass recipe ── */
+  --glass-fill-sidebar:  rgba(255,255,255,0.55);
+  --glass-fill-card:     rgba(255,255,255,0.62);
+  --glass-fill-inset:    rgba(255,255,255,0.46);
+  --glass-border:        rgba(255,255,255,0.70);
+  --glass-blur:          20px;
+
+  /* ── Shadows ── */
+  --shadow-panel:     0 18px 48px rgba(28,28,30,0.12);
+  --shadow-glass:     0 24px 60px rgba(28,28,30,0.14);
+  --shadow-cta:       0 12px 28px rgba(0,122,255,0.28);
+  --shadow-cta-hover: 0 16px 36px rgba(0,122,255,0.34);
+  --shadow-logo:      0 10px 22px rgba(0,122,255,0.18);
+  --shadow-card-soft: 0  6px 20px rgba(28,28,30,0.06);
+
+  /* ── Radii ── */
+  --r-xs: 4px;     /* almost never used; kept for completeness */
+  --r-sm: 6px;     /* small inline pills */
+  --r-md: 8px;     /* DEFAULT — buttons, cards, inputs, inset rows */
+  --r-lg: 12px;    /* used by AppLayout sidebar logo container */
+  --r-xl: 16px;    /* logo / login mark / large brand surfaces */
+  --r-2xl: 20px;   /* iOS 26 app-icon-style */
+  --r-pill: 999px; /* badges, switch */
+
+  /* ── Spacing (8px grid; same as Tailwind defaults) ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ── Control heights ── */
+  --h-control-sm: 28px;  /* button sm, switch wrap */
+  --h-control-md: 32px;  /* button md, input, select */
+  --h-icon-button: 32px;
+  --h-row-nav: 32px;
+  --h-header: 56px;
+  --h-sidebar-logo: 64px;
+
+  /* ── Typography ── */
+  --font-sans: "SF Pro Display", Inter, ui-sans-serif, system-ui,
+               -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo",
+               "Cascadia Code", "Consolas", monospace;
+
+  /* type ramp */
+  --fs-display: 28px;     --lh-display: 34px;
+  --fs-h1:      20px;     --lh-h1:      28px;
+  --fs-h2:      16px;     --lh-h2:      24px;
+  --fs-body:    14px;     --lh-body:    20px;
+  --fs-mobile-title: 20px;
+  --fs-mobile-list:  16px;
+  --fs-caption: 12px;     --lh-caption: 16px;
+  --fs-mono:    13px;     --lh-mono:    18px;
+  --fs-stat:    30px;     --lh-stat:    36px;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+
+  /* ── Page background ── */
+  --bg-page:
+    radial-gradient(circle at 18% 12%, rgba(90,203,250,0.25), transparent 28rem),
+    radial-gradient(circle at 82%  6%, rgba(176,217,255,0.42), transparent 26rem),
+    linear-gradient(180deg, #FFFFFF 0%, #F0F7FF 42%, #F0F2F5 100%);
+
+  /* ── Motion ── */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur:      200ms;
+  --dur-slow: 300ms;
+}
+
+/* ── Dark theme override ── */
+[data-theme="dark"] {
+  --background:        218 39% 10%;
+  --surface:           219 36% 14%;
+  --surface-elevated:  214 38% 18%;
+  --border:            213 24% 25%;
+  --muted:             214 38% 18%;
+  --muted-foreground:  213 22% 70%;
+  --foreground:        207 74% 96%;
+  --primary:           203 100% 61%;
+
+  --glass-fill-sidebar: rgba(255,255,255,0.10);
+  --glass-fill-card:    rgba(255,255,255,0.10);
+  --glass-fill-inset:   rgba(255,255,255,0.05);
+  --glass-border:       rgba(255,255,255,0.10);
+
+  --bg-page:
+    radial-gradient(circle at 18% 12%, rgba(0,122,255,0.20), transparent 28rem),
+    radial-gradient(circle at 82%  6%, rgba(90,203,250,0.12), transparent 26rem),
+    linear-gradient(180deg, #09111F 0%, #101A2B 52%, #0B1220 100%);
+}
+
+/* ============================================================================
+   Element-level type defaults
+   ============================================================================ */
+html, body {
+  font-family: var(--font-sans);
+  color: hsl(var(--foreground));
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: var(--fs-h1);   line-height: var(--lh-h1); font-weight: var(--fw-semibold); letter-spacing: -0.01em; margin: 0; }
+h2 { font-size: var(--fs-h2);   line-height: var(--lh-h2); font-weight: var(--fw-semibold); margin: 0; }
+p, li { font-size: var(--fs-body); line-height: var(--lh-body); margin: 0; }
+small, .caption { font-size: var(--fs-caption); line-height: var(--lh-caption); color: hsl(var(--muted-foreground)); }
+code, kbd, samp, pre { font-family: var(--font-mono); font-size: var(--fs-mono); line-height: var(--lh-mono); }
+
+/* ============================================================================
+   Reusable utility classes (used in preview/* cards and ui_kits)
+   ============================================================================ */
+.r115-glass-card {
+  background: var(--glass-fill-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-panel);
+}
+.r115-glass-sidebar {
+  background: var(--glass-fill-sidebar);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-glass);
+}
+.r115-glass-inset {
+  background: var(--glass-fill-inset);
+  border-radius: var(--r-md);
+}
+.r115-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--h-control-md); padding: 0 14px;
+  border: none; border-radius: var(--r-md);
+  background: var(--r115-primary); color: #fff;
+  font: var(--fw-medium) var(--fs-body)/1 var(--font-sans);
+  box-shadow: var(--shadow-cta);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+  cursor: pointer;
+}
+.r115-btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-cta-hover); background: #0070F0; }
+.r115-btn-primary:active { transform: translateY(0); background: #0066D9; box-shadow: var(--shadow-cta); }
+.r115-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--h-control-md); padding: 0 14px;
+  border: 1px solid var(--glass-border); border-radius: var(--r-md);
+  background: rgba(255,255,255,0.58); color: hsl(var(--foreground));
+  font: var(--fw-medium) var(--fs-body)/1 var(--font-sans);
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-card-soft);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+  cursor: pointer;
+}
+.r115-btn-secondary:hover { transform: translateY(-2px); background: rgba(255,255,255,0.72); }
+.r115-input {
+  height: var(--h-control-md); width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--glass-border); border-radius: var(--r-md);
+  background: rgba(255,255,255,0.62); color: hsl(var(--foreground));
+  font: var(--fw-regular) var(--fs-body)/1 var(--font-sans);
+  outline: none; backdrop-filter: blur(var(--glass-blur));
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.r115-input:focus {
+  border-color: rgba(0,122,255,0.6);
+  box-shadow: 0 0 0 4px rgba(0,122,255,0.15);
+}
+.r115-badge {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 6px;
+  border-radius: var(--r-xs);
+  font: var(--fw-medium) var(--fs-caption)/1 var(--font-sans);
+  letter-spacing: 0.01em;
+}
+.r115-badge-success { background: rgba(52,199,89,0.12);  color: #2BA84A; }
+.r115-badge-warning { background: rgba(255,149,0,0.12);  color: #C97400; }
+.r115-badge-danger  { background: rgba(255,59,48,0.12);  color: #D8281D; }
+.r115-badge-default { background: rgba(255,255,255,0.54); color: hsl(var(--muted-foreground)); backdrop-filter: blur(var(--glass-blur)); }

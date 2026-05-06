@@ -21,6 +21,7 @@ from app.core.offline_task_retry import sehua_offline
 from app.core.selenium_browser import SeleniumBrowser
 from app.utils.utils import get_magnet_hash, read_yaml_file, check_magnet
 from app.utils.message_queue import add_task_to_queue
+from telegram.helpers import escape_markdown
 import asyncio
 import requests
 
@@ -397,13 +398,16 @@ async def sehuatang_spider_start_async():
     yesterday_str = (today - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     # 初始化全局浏览器
     browser = SeleniumBrowser(get_base_url())
+    crawl_finished = False
+    section_name = "未知"
 
     try:
         await browser.init_browser()
 
         if not browser.driver:
             reason = getattr(browser, "last_error", None) or "请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务状态"
-            add_task_to_queue(init.bot_config['allowed_user'], None, f"❌ 浏览器初始化失败！{reason}")
+            message = escape_markdown(f"❌ 浏览器初始化失败！{reason}", version=2)
+            add_task_to_queue(init.bot_config['allowed_user'], None, message)
             return
 
         await apply_configured_cookies()
@@ -419,6 +423,7 @@ async def sehuatang_spider_start_async():
             init.logger.info(f"{section_name} 分区爬取完成")
             delay = random.uniform(5, 10)
             await asyncio.sleep(delay)
+        crawl_finished = True
     except Exception as e:
         init.logger.warn(f"爬取 {section_name} 分区时发生错误: {str(e)}")
         import traceback
@@ -426,6 +431,10 @@ async def sehuatang_spider_start_async():
     finally:
         # 关闭全局浏览器
         await browser.close()
+
+    if not crawl_finished:
+        init.logger.warn("涩花爬取未完成，跳过离线任务")
+        return
 
     # 离线到115 (Sync)
     init.logger.info("开始执行涩花离线任务...")
@@ -444,13 +453,16 @@ async def sehuatang_spider_by_date_async(date, end_date=None):
     browser = SeleniumBrowser(get_base_url())
     crawl_mode = _normalize_crawl_mode(date, end_date)
     date_label = _format_crawl_mode(crawl_mode)
+    crawl_finished = False
+    section_name = "未知"
 
     try:
         await browser.init_browser()
         # 初始化全局浏览器
         if not browser.driver:
             reason = getattr(browser, "last_error", None) or "请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务状态"
-            add_task_to_queue(init.bot_config['allowed_user'], None, f"❌ 浏览器初始化失败！{reason}")
+            message = escape_markdown(f"❌ 浏览器初始化失败！{reason}", version=2)
+            add_task_to_queue(init.bot_config['allowed_user'], None, message)
             return
 
         await apply_configured_cookies()
@@ -465,6 +477,7 @@ async def sehuatang_spider_by_date_async(date, end_date=None):
             init.logger.info(f"{section_name} 分区爬取完成")
             delay = random.uniform(5, 10)
             await asyncio.sleep(delay)
+        crawl_finished = True
     except Exception as e:
         init.logger.warn(f"爬取 {section_name} 分区时发生错误: {str(e)}")
         import traceback
@@ -474,8 +487,11 @@ async def sehuatang_spider_by_date_async(date, end_date=None):
         await browser.close()
         try:
             # 离线到115 (Sync)
-            init.logger.info("开始执行涩花离线任务...")
-            sehua_offline(date_label)
+            if crawl_finished:
+                init.logger.info("开始执行涩花离线任务...")
+                sehua_offline(date_label)
+            else:
+                init.logger.warn("涩花爬取未完成，跳过离线任务")
         except Exception as e:
             init.logger.error(f"涩花离线任务执行失败: {e}")
         finally:

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><title>Page header</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  body { align-items: flex-start; padding: 22px; }
+  .stack { display: flex; flex-direction: column; gap: 18px; width: 100%; }
+  .header { display: flex; justify-content: space-between; align-items: flex-end; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--r115-ink); margin: 0; }
+  .desc { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+  .actions { display: flex; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; font: 500 13px/1 var(--font-sans); border-radius: var(--r-md); border: none; }
+  .primary { background: var(--r115-primary); color: white; box-shadow: var(--shadow-cta); }
+  .secondary { background: rgba(255,255,255,0.58); color: var(--r115-ink); border: 1px solid rgba(255,255,255,0.7); backdrop-filter: blur(20px); }
+  .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-xs); font: 500 12px/1 var(--font-sans); background: rgba(52,199,89,0.12); color: #2BA84A; }
+  svg { width: 14px; height: 14px; }
+</style></head>
+<body><div class="card-stage"><div class="stack">
+  <div class="header">
+    <div>
+      <h1>爬取控制</h1>
+      <div class="desc">按页面显示时间触发涩花爬虫，并观察后端实时日志</div>
+    </div>
+    <div class="actions"><span class="badge">空闲</span></div>
+  </div>
+  <div class="header">
+    <div>
+      <h1>涩花数据</h1>
+      <div class="desc">筛选已抓取资源，提交单条或批量离线任务</div>
+    </div>
+    <div class="actions">
+      <button class="btn secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+        批量删除
+      </button>
+      <button class="btn primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        批量离线
+      </button>
+    </div>
+  </div>
+</div></div></body></html>

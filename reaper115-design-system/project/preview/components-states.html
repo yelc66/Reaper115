@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><title>Empty / Loading / Error</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  body { align-items: flex-start; padding: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; width: 100%; }
+  .empty {
+    border: 1.5px dashed hsl(var(--border)); border-radius: var(--r-md);
+    padding: 24px 16px; text-align: center;
+    color: hsl(var(--muted-foreground)); font-size: 13px;
+  }
+  .loading {
+    border-radius: var(--r-md); padding: 24px 16px; text-align: center;
+    color: hsl(var(--muted-foreground)); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: rgba(255,255,255,0.46);
+  }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid hsl(var(--muted-foreground));
+    border-top-color: transparent;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error {
+    border: 1px solid rgba(255,59,48,0.20); background: rgba(255,59,48,0.08);
+    border-radius: var(--r-md); padding: 16px; font-size: 13px; color: #D8281D;
+  }
+  h4 { font-size: 11px; color: hsl(var(--muted-foreground)); font-weight: 500; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+</style></head>
+<body><div class="card-stage"><div class="grid">
+  <div>
+    <h4>Empty</h4>
+    <div class="empty">暂无策略规则</div>
+  </div>
+  <div>
+    <h4>Loading</h4>
+    <div class="loading"><span class="spinner"></span>加载中</div>
+  </div>
+  <div>
+    <h4>Error</h4>
+    <div class="error">登录失败：无效的认证密钥</div>
+  </div>
+</div></div></body></html>

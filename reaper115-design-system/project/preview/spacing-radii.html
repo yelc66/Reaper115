@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>Radii</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  .row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; width: 100%; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .swatch {
+    width: 78px; height: 78px;
+    background: linear-gradient(135deg, #007AFF, #5ACBFA);
+    box-shadow: var(--shadow-cta);
+  }
+  .lbl { font-size: 11px; font-weight: 600; color: var(--r115-ink); }
+  .meta { font-size: 10px; font-family: var(--font-mono); color: hsl(var(--muted-foreground)); }
+</style></head>
+<body><div class="card-stage">
+  <div class="row">
+    <div class="item"><div class="swatch" style="border-radius:6px"></div><div class="lbl">sm</div><div class="meta">6px</div></div>
+    <div class="item"><div class="swatch" style="border-radius:8px"></div><div class="lbl">md · default</div><div class="meta">8px</div></div>
+    <div class="item"><div class="swatch" style="border-radius:12px"></div><div class="lbl">lg</div><div class="meta">12px</div></div>
+    <div class="item"><div class="swatch" style="border-radius:16px"></div><div class="lbl">xl · logo</div><div class="meta">16px</div></div>
+    <div class="item"><div class="swatch" style="border-radius:20px"></div><div class="lbl">2xl · iOS</div><div class="meta">20px</div></div>
+    <div class="item"><div class="swatch" style="border-radius:999px"></div><div class="lbl">pill</div><div class="meta">∞</div></div>
+  </div>
+</div></body></html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><title>Logo</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  body { padding: 18px; }
+  .row { display: grid; grid-template-columns: 168px 1fr; gap: 22px; align-items: center; width: 100%; }
+  .hero {
+    width: 168px; height: 168px;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(90,203,250,0.45), transparent 60%),
+      linear-gradient(180deg, #FFFFFF, #E5F2FF);
+    border-radius: var(--r-xl);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255,255,255,0.7); box-shadow: var(--shadow-glass);
+  }
+  .hero img { width: 130px; height: 130px; border-radius: 24px; box-shadow: 0 14px 30px rgba(0,122,255,0.22); }
+  .meta { display: flex; flex-direction: column; gap: 8px; }
+  .name { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--r115-ink); }
+  .tag { font-size: 13px; color: hsl(var(--muted-foreground)); }
+  .strip { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .strip img { border-radius: 12px; box-shadow: 0 6px 16px rgba(0,122,255,0.15); }
+  .lbl { font-size: 10px; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); margin-top: 4px; text-align: center; }
+  .stack-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+</style></head>
+<body><div class="card-stage"><div class="row">
+  <div class="hero"><img src="../assets/logo/sehuatang-115-bot-256.png" alt=""></div>
+  <div class="meta">
+    <div class="name">Reaper115</div>
+    <div class="tag">Telegram 管理控制台 · iOS 26 / Liquid Glass</div>
+    <div class="strip">
+      <div class="stack-item"><img src="../assets/logo/sehuatang-115-bot-128.png" width="56" height="56" alt=""><span class="lbl">128</span></div>
+      <div class="stack-item"><img src="../assets/logo/sehuatang-115-bot-256.png" width="72" height="72" alt=""><span class="lbl">256</span></div>
+      <div class="stack-item"><img src="../assets/logo/sehuatang-115-bot-1024.png" width="92" height="92" alt=""><span class="lbl">1024</span></div>
+    </div>
+  </div>
+</div></div></body></html>

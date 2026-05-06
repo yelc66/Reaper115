@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><title>Badges &amp; status</title>
+<link rel="stylesheet" href="_card_base.css">
+<style>
+  body { align-items: flex-start; }
+  .stack { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lbl { font-size: 11px; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); width: 90px; }
+  .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--r-xs); font: 500 12px/1 var(--font-sans); letter-spacing: 0.01em; gap: 4px; }
+  .b-default { background: rgba(255,255,255,0.55); color: hsl(var(--muted-foreground)); border: 1px solid rgba(255,255,255,0.6); backdrop-filter: blur(20px); }
+  .b-success { background: rgba(52,199,89,0.12); color: #2BA84A; }
+  .b-warning { background: rgba(255,149,0,0.14); color: #C97400; }
+  .b-danger  { background: rgba(255,59,48,0.12); color: #D8281D; }
+  .b-info    { background: rgba(0,122,255,0.10); color: #0666D9; }
+
+  .status-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.46); border-radius: var(--r-md); }
+  .status-row .name { font-size: 13px; color: hsl(var(--muted-foreground)); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+</style></head>
+<body><div class="card-stage"><div class="stack">
+  <div class="row">
+    <div class="lbl">Badges</div>
+    <span class="badge b-success">已离线</span>
+    <span class="badge b-warning">待处理</span>
+    <span class="badge b-danger">异常</span>
+    <span class="badge b-info">运行中</span>
+    <span class="badge b-default">空闲</span>
+  </div>
+  <div class="grid2">
+    <div class="status-row"><span class="name">115 OpenAPI</span><span class="badge b-success">正常</span></div>
+    <div class="status-row"><span class="name">Token 文件</span><span class="badge b-success">正常</span></div>
+    <div class="status-row"><span class="name">爬虫状态</span><span class="badge b-warning">运行中</span></div>
+    <div class="status-row"><span class="name">调试模式</span><span class="badge b-warning">开启</span></div>
+  </div>
+</div></div></body></html>

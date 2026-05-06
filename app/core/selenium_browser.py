@@ -17,6 +17,49 @@ FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://flaresolverr:8191/v1")
 # 远程 Selenium 配置
 REMOTE_SELENIUM_URL = os.getenv("REMOTE_SELENIUM_URL", None)
 
+
+def _build_chrome_options():
+    options = webdriver.ChromeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument(f'user-agent={init.USER_AGENT}')
+    return options
+
+
+def check_browser_health(timeout=15):
+    """启动时检查远程 Selenium 浏览器是否能创建并执行一个基础会话。"""
+    if not REMOTE_SELENIUM_URL:
+        return False, "未配置 REMOTE_SELENIUM_URL，无法连接远程 Selenium 浏览器"
+
+    driver = None
+    try:
+        init.logger.info(f"正在检查远程 Selenium 浏览器: {REMOTE_SELENIUM_URL} ...")
+        driver = webdriver.Remote(
+            command_executor=REMOTE_SELENIUM_URL,
+            options=_build_chrome_options()
+        )
+        driver.set_page_load_timeout(timeout)
+        driver.get("about:blank")
+        ready_state = driver.execute_script("return document.readyState")
+        user_agent = driver.execute_script("return navigator.userAgent")
+
+        if ready_state not in ("interactive", "complete"):
+            return False, f"浏览器会话异常，页面状态: {ready_state}"
+
+        caps = driver.capabilities or {}
+        browser_name = caps.get("browserName", "Chrome")
+        browser_version = caps.get("browserVersion") or caps.get("version") or "unknown"
+        return True, f"浏览器健康检查通过: {browser_name} {browser_version}, User-Agent: {user_agent}"
+    except Exception as e:
+        return False, f"浏览器健康检查失败: {e}"
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except Exception as e:
+                init.logger.warn(f"浏览器健康检查清理失败: {e}")
+
+
 class SeleniumBrowser:
     def __init__(self, base_url=None):
         self.base_url = base_url
@@ -36,15 +79,13 @@ class SeleniumBrowser:
         try:
             self.last_error = None
             init.logger.info(f"正在连接远程 Selenium: {REMOTE_SELENIUM_URL} ...")
-            options = webdriver.ChromeOptions()
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument(f'user-agent={init.USER_AGENT}')
 
             self.driver = webdriver.Remote(
                 command_executor=REMOTE_SELENIUM_URL,
-                options=options
+                options=_build_chrome_options()
             )
+            user_agent = self.driver.execute_script("return navigator.userAgent")
+            init.logger.info(f"远程 Selenium 会话已创建，浏览器 User-Agent: {user_agent}")
 
             if self.base_url:
                 if not self.base_url.startswith('http'):

@@ -19,6 +19,7 @@ from app.handlers.offline_task_handler import register_offline_task_handlers
 from app.handlers.crawl_handler import register_crawl_handlers
 from app.handlers.auth_115_handler import register_auth_115_handlers
 from app.web.server import start_web_server_in_thread
+from app.core.selenium_browser import check_browser_health
 
 
 def get_version(md_format=False):
@@ -108,6 +109,31 @@ def send_start_message():
         )
 
 
+def check_browser_on_startup():
+    """启动时检查浏览器状态。失败不阻塞 Bot，但爬虫启用时会通知用户。"""
+    spider_enabled = init.bot_config.get("sehuatang_spider", {}).get("enable", False)
+    ok, message = check_browser_health()
+
+    if ok:
+        init.logger.info(message)
+        return
+
+    log_message = f"启动浏览器检测未通过：{message}"
+    if spider_enabled:
+        init.logger.error(log_message)
+        notify_message = escape_markdown(
+            f"⚠️ 启动浏览器检测未通过：{message}\n涩花爬虫可能无法正常运行，请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务。",
+            version=2
+        )
+        add_task_to_queue(
+            init.bot_config['allowed_user'],
+            None,
+            message=notify_message
+        )
+    else:
+        init.logger.warn(f"{log_message}。当前涩花爬虫未启用，仅记录此提示。")
+
+
 def update_logger_level():
     import logging
     logging.getLogger('httpx').setLevel(logging.WARNING)
@@ -161,6 +187,7 @@ if __name__ == '__main__':
             exit(1)
     init.logger.info("Starting bot with configuration:")
     init.logger.info(json.dumps(init.bot_config))
+    check_browser_on_startup()
     # 调整telegram日志级别
     update_logger_level()
     token = init.bot_config['bot_token']

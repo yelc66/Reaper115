@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import init
+from app.core.selenium_browser import check_browser_health
 from app.web.routers import crawl, dashboard, sehua, strategy, system, tasks
 from app.web.utils import install_log_buffer
 
@@ -49,6 +50,18 @@ def _is_authorized(candidate: str | None) -> bool:
 
 def create_app():
     app = FastAPI(title="Telegram-115Bot Web API", version="0.1.0")
+
+    @app.on_event("startup")
+    def check_browser_on_startup():
+        if not init.bot_config.get("sehuatang_spider", {}).get("enable", False):
+            init.logger.info("启动浏览器检测跳过：涩花爬虫未启用")
+            return
+
+        ok, message = check_browser_health()
+        if ok:
+            init.logger.info(message)
+        else:
+            init.logger.error(f"启动浏览器检测未通过：{message}")
 
     app.add_middleware(
         CORSMiddleware,
