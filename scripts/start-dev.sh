@@ -12,7 +12,7 @@ TAIL_PID=""
 
 usage() {
   cat <<'EOF'
-Usage: scripts/start-dev.sh [--api-only|--bot] [--skip-install]
+Usage: scripts/start-dev.sh [--api-only|--bot] [--check-browser] [--skip-install]
 
 Starts the local development stack:
   - backend: FastAPI API only by default, or the full Telegram bot with --bot
@@ -21,19 +21,23 @@ Starts the local development stack:
 Options:
   --api-only      Start only the FastAPI backend thread entrypoint (default)
   --bot           Start app/115bot.py through scripts/dev.sh
+  --check-browser Check the configured remote Selenium browser and exit
   --skip-install  Do not create venv/install npm packages automatically
   -h, --help      Show this help
 
 Environment overrides:
   BACKEND_PORT=8000
+  FRONTEND_HOST=127.0.0.1
   FRONTEND_PORT=5173
   VITE_API_BASE_URL=http://127.0.0.1:8000
 EOF
 }
 
 MODE="api-only"
+CHECK_BROWSER=0
 SKIP_INSTALL=0
 BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://127.0.0.1:${BACKEND_PORT}}"
 
@@ -44,6 +48,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --bot)
       MODE="bot"
+      ;;
+    --check-browser)
+      CHECK_BROWSER=1
       ;;
     --skip-install)
       SKIP_INSTALL=1
@@ -107,6 +114,13 @@ if [ ! -f "$ROOT_DIR/config/config.yaml" ] && [ -f "$ROOT_DIR/config/config.yaml
   log "created config/config.yaml from config/config.yaml.example"
 fi
 
+if [ -f "$ROOT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 if [ ! -f "$WEB_DIR/.env" ]; then
   printf 'VITE_API_BASE_URL=%s\n' "$VITE_API_BASE_URL" > "$WEB_DIR/.env"
   log "created web-ui/.env"
@@ -152,8 +166,27 @@ elif [ ! -x "$ROOT_DIR/.venv/bin/python" ]; then
   exit 1
 fi
 
-if [ -f "$ROOT_DIR/config/config.yaml" ] && grep -Eq 'your_bot_token|your_user_id|your_115_app_id|your_access_token|your_refresh_token' "$ROOT_DIR/config/config.yaml"; then
+if [ -f "$ROOT_DIR/config/config.yaml" ] && [ "$MODE" = "bot" ] && grep -Eq 'your_bot_token|your_user_id|your_115_app_id|your_access_token|your_refresh_token' "$ROOT_DIR/config/config.yaml"; then
   log "warning: config/config.yaml still contains placeholder values; backend may fail until required values are filled."
+fi
+
+export TG115_DEBUG=1
+export PYTHONPATH="$ROOT_DIR:$ROOT_DIR/app:$ROOT_DIR/app/utils:$ROOT_DIR/app/core:$ROOT_DIR/app/handlers"
+
+if [ "$CHECK_BROWSER" -eq 1 ]; then
+  "$ROOT_DIR/.venv/bin/python" - <<'PY'
+import init
+from app.core.selenium_browser import check_browser_health
+
+init.init()
+ok, message = check_browser_health()
+if ok:
+    init.logger.info(message)
+else:
+    init.logger.error(f"浏览器检测失败：{message}")
+    raise SystemExit(1)
+PY
+  exit $?
 fi
 
 if "$ROOT_DIR/.venv/bin/python" - "$BACKEND_PORT" "$FRONTEND_PORT" <<'PY'
@@ -179,9 +212,6 @@ else
   exit 1
 fi
 
-export TG115_DEBUG=1
-export PYTHONPATH="$ROOT_DIR:$ROOT_DIR/app:$ROOT_DIR/app/utils:$ROOT_DIR/app/core:$ROOT_DIR/app/handlers"
-
 log "backend mode: $MODE"
 if [ "$MODE" = "bot" ]; then
   "$ROOT_DIR/scripts/dev.sh" >"$BACKEND_LOG" 2>&1 &
@@ -191,12 +221,12 @@ fi
 BACKEND_PID="$!"
 
 log "frontend API base: $VITE_API_BASE_URL"
-(cd "$WEB_DIR" && VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT") >"$FRONTEND_LOG" 2>&1 &
+(cd "$WEB_DIR" && VITE_API_BASE_URL="$VITE_API_BASE_URL" VITE_DEV_HOST="$FRONTEND_HOST" npm run dev -- --host "$FRONTEND_HOST" --port "$FRONTEND_PORT") >"$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID="$!"
 
 log "backend log: $BACKEND_LOG"
 log "frontend log: $FRONTEND_LOG"
-log "frontend: http://localhost:${FRONTEND_PORT}"
+log "frontend: http://${FRONTEND_HOST}:${FRONTEND_PORT}"
 log "backend:  http://127.0.0.1:${BACKEND_PORT}/api/health"
 log "press Ctrl+C to stop both processes"
 

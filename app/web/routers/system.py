@@ -2,6 +2,10 @@
 
 import asyncio
 import json
+import os
+import sys
+import threading
+import time
 
 import requests
 from fastapi import APIRouter, HTTPException
@@ -39,7 +43,6 @@ def system_status():
         "debug_mode": init.debug_mode,
         "paths": {
             "config": init.CONFIG_FILE,
-            "strategy": init.STRATEGY_FILE,
             "db": init.DB_FILE,
         },
         "user_info": user_info,
@@ -51,11 +54,46 @@ def get_config():
     return {"config": read_yaml(init.CONFIG_FILE)}
 
 
+def _schedule_restart():
+    def _do():
+        time.sleep(1)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    threading.Thread(target=_do, daemon=True).start()
+
+
+@router.post("/restart")
+def restart_service():
+    _schedule_restart()
+    return {"ok": True, "message": "服务正在重启，约 5 秒后恢复"}
+
+
 @router.put("/config")
 def update_config(payload: ConfigUpdateRequest):
+    old_token = init.bot_config.get("bot_token", "")
+    old_115 = (
+        init.bot_config.get("access_token", ""),
+        init.bot_config.get("refresh_token", ""),
+        init.bot_config.get("115_app_id", ""),
+    )
+
     write_yaml(init.CONFIG_FILE, payload.config)
     init.load_yaml_config()
-    return {"ok": True, "config": init.bot_config}
+
+    new_token = init.bot_config.get("bot_token", "")
+    new_115 = (
+        init.bot_config.get("access_token", ""),
+        init.bot_config.get("refresh_token", ""),
+        init.bot_config.get("115_app_id", ""),
+    )
+
+    if new_token != old_token:
+        _schedule_restart()
+        return {"ok": True, "config": init.bot_config, "restarting": True}
+
+    if new_115 != old_115:
+        init.initialize_115open()
+
+    return {"ok": True, "config": init.bot_config, "restarting": False}
 
 
 @router.post("/test/telegram")

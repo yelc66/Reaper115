@@ -72,8 +72,6 @@ CRAWL_SEHUA_STATUS = 0  # 涩花爬取状态
 CONFIG_FILE = "/config/config.yaml"
 # yaml配置文件示例
 CONFIG_FILE_EXAMPLE = "/config/config.yaml.example"
-# 抓取策略文件
-STRATEGY_FILE = "/config/crawling_strategy.yaml"
 # SessionFile
 TG_SESSION_FILE = "/config/user_session.session"
 # DB File
@@ -112,7 +110,6 @@ USER_AGENT = f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like G
 if debug_mode:
     CONFIG_FILE = "config/config.yaml"
     CONFIG_FILE_EXAMPLE = "config/config.yaml.example"
-    STRATEGY_FILE = "config/crawling_strategy.yaml"
     TG_SESSION_FILE = "config/user_session.session"
     DB_FILE = "config/db.db"
     APP = "app"

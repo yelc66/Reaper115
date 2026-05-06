@@ -32,12 +32,15 @@ type FormState = {
   aiApiUrl: string;
   aiApiKey: string;
   aiModel: string;
+  remoteSeleniumUrl: string;
+  flareSolverrUrl: string;
 };
 
 function toFormState(config: Record<string, unknown>): FormState {
   const clean = (config.clean_policy ?? {}) as Record<string, unknown>;
   const web = (config.web ?? {}) as Record<string, unknown>;
   const ai = (config.ai ?? {}) as Record<string, unknown>;
+  const spider = (config.sehuatang_spider ?? {}) as Record<string, unknown>;
   return {
     logLevel: (config.log_level as string) || "info",
     webEnabled: web.enable !== false,
@@ -53,6 +56,8 @@ function toFormState(config: Record<string, unknown>): FormState {
     aiModel: (ai.model as string) || "",
     cleanEnabled: (clean.switch as string) !== "off",
     cleanLessThan: (clean.less_than as string) || "400M",
+    remoteSeleniumUrl: (spider.remote_selenium_url as string) || "",
+    flareSolverrUrl: (spider.flaresolverr_url as string) || "",
   };
 }
 
@@ -68,6 +73,11 @@ function toApiConfig(form: FormState, original: Record<string, unknown>): Record
     refresh_token: form.refreshToken,
     ai: { ...((original.ai as object) || {}), api_url: form.aiApiUrl, api_key: form.aiApiKey, model: form.aiModel },
     clean_policy: { ...((original.clean_policy as object) || {}), switch: form.cleanEnabled ? "on" : "off", less_than: form.cleanLessThan },
+    sehuatang_spider: {
+      ...((original.sehuatang_spider as object) || {}),
+      remote_selenium_url: form.remoteSeleniumUrl,
+      flaresolverr_url: form.flareSolverrUrl,
+    },
   };
 }
 
@@ -103,6 +113,7 @@ export function Config() {
   const mainSave = useSectionSave("保存");
   const tgSave = useSectionSave("保存并测试", systemApi.testTelegram);
   const api115Save = useSectionSave("保存并测试", systemApi.test115);
+  const browserSave = useSectionSave("保存");
   const aiSave = useSectionSave("保存");
 
   useEffect(() => {
@@ -237,6 +248,29 @@ export function Config() {
             value={formState.refreshToken}
             onChange={(e) => patch("refreshToken", e.target.value)}
             placeholder="填写 Refresh Token"
+          />
+        </Row>
+      </Section>
+
+      {/* ── Browser ── */}
+      <Section
+        title="浏览器配置"
+        hint="涩花爬虫使用的远程浏览器服务地址，留空则不启用。"
+        saveState={browserSave}
+        onSave={() => saveSection(browserSave)}
+      >
+        <Row label="远程 Selenium" hint="填写 host，代码自动拼接 /wd/hub">
+          <Input
+            value={formState.remoteSeleniumUrl}
+            onChange={(e) => patch("remoteSeleniumUrl", e.target.value)}
+            placeholder="http://selenium:4444"
+          />
+        </Row>
+        <Row label="FlareSolverr" hint="填写 host，代码自动拼接 /v1">
+          <Input
+            value={formState.flareSolverrUrl}
+            onChange={(e) => patch("flareSolverrUrl", e.target.value)}
+            placeholder="http://flaresolverr:8191"
           />
         </Row>
       </Section>

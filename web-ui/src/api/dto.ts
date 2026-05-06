@@ -42,19 +42,6 @@ export type SehuaListResponseDto = {
   items: SehuaItemDto[];
 };
 
-export type StrategyRuleDto = {
-  id: number;
-  site: string;
-  section_name: string;
-  name: string;
-  pattern: string;
-  save_path?: string | null;
-  kind: "include" | "exclude";
-  active: boolean;
-};
-
-export type StrategyRuleInputDto = Omit<StrategyRuleDto, "id">;
-
 export type OfflineTaskDto = {
   id: number;
   title: string;

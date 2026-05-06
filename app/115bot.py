@@ -22,6 +22,17 @@ from app.web.server import start_web_server_in_thread
 from app.core.selenium_browser import check_browser_health
 
 
+def telegram_configured():
+    token = str(init.bot_config.get('bot_token') or '').strip()
+    allowed_user = str(init.bot_config.get('allowed_user') or '').strip()
+    return (
+        token
+        and token != 'your_bot_token'
+        and allowed_user
+        and allowed_user != 'your_user_id'
+    )
+
+
 def get_version(md_format=False):
     version = "v3.4.1"
     if md_format:
@@ -61,6 +72,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init.load_yaml_config()
+    init.initialize_115open()
     init.logger.info("Reload configuration success:")
     init.logger.info(json.dumps(init.bot_config))
     await context.bot.send_message(chat_id=update.effective_chat.id, text="🔁重载配置完成！", parse_mode="html")
@@ -110,28 +122,31 @@ def send_start_message():
 
 
 def check_browser_on_startup():
-    """启动时检查浏览器状态。失败不阻塞 Bot，但爬虫启用时会通知用户。"""
+    """启动时检查浏览器状态。爬虫启用时检测失败会阻止启动。"""
     spider_enabled = init.bot_config.get("sehuatang_spider", {}).get("enable", False)
     ok, message = check_browser_health()
 
     if ok:
         init.logger.info(message)
-        return
+        return True
 
     log_message = f"启动浏览器检测未通过：{message}"
     if spider_enabled:
         init.logger.error(log_message)
-        notify_message = escape_markdown(
-            f"⚠️ 启动浏览器检测未通过：{message}\n涩花爬虫可能无法正常运行，请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务。",
-            version=2
-        )
-        add_task_to_queue(
-            init.bot_config['allowed_user'],
-            None,
-            message=notify_message
-        )
+        if telegram_configured():
+            notify_message = escape_markdown(
+                f"⚠️ 启动浏览器检测未通过：{message}\n涩花爬虫无法正常运行，请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务。",
+                version=2
+            )
+            add_task_to_queue(
+                init.bot_config['allowed_user'],
+                None,
+                message=notify_message
+            )
+        return False
     else:
         init.logger.warn(f"{log_message}。当前涩花爬虫未启用，仅记录此提示。")
+        return True
 
 
 def update_logger_level():
@@ -169,57 +184,67 @@ async def post_init(application):
 
 if __name__ == '__main__':
     init.init()
-    # 启动消息队列
-    message_thread = threading.Thread(target=start_async_loop, daemon=True)
-    message_thread.start()
-    # 等待消息队列准备就绪
-    import app.utils.message_queue as message_queue
-    max_wait = 30  # 最多等待30秒
-    wait_count = 0
-    while True:
-        if message_queue.global_loop is not None:
-            init.logger.info("消息队列线程已准备就绪！")
-            break
-        time.sleep(1)
-        wait_count += 1
-        if wait_count >= max_wait:
-            init.logger.error("消息队列线程未准备就绪，程序将退出。")
-            exit(1)
+    tg_enabled = telegram_configured()
+    if tg_enabled:
+        # 启动消息队列
+        message_thread = threading.Thread(target=start_async_loop, daemon=True)
+        message_thread.start()
+        # 等待消息队列准备就绪
+        import app.utils.message_queue as message_queue
+        max_wait = 30  # 最多等待30秒
+        wait_count = 0
+        while True:
+            if message_queue.global_loop is not None:
+                init.logger.info("消息队列线程已准备就绪！")
+                break
+            time.sleep(1)
+            wait_count += 1
+            if wait_count >= max_wait:
+                init.logger.error("消息队列线程未准备就绪，程序将退出。")
+                exit(1)
+    else:
+        init.logger.warn("Telegram Bot 未配置，跳过 Telegram polling 和消息队列。")
     init.logger.info("Starting bot with configuration:")
     init.logger.info(json.dumps(init.bot_config))
-    check_browser_on_startup()
+    if not check_browser_on_startup():
+        init.logger.error("浏览器检测失败，程序将退出。")
+        exit(1)
     # 调整telegram日志级别
     update_logger_level()
-    token = init.bot_config['bot_token']
-    application = Application.builder().token(token).post_init(post_init).build()
+    token = str(init.bot_config.get('bot_token') or '').strip()
+    application = None
+    if tg_enabled:
+        application = Application.builder().token(token).post_init(post_init).build()
 
-    # 启动帮助
-    start_handler = CommandHandler('start', start)
-    application.add_handler(start_handler)
-    # 重载配置
-    reload_handler = CommandHandler('reload', reload)
-    application.add_handler(reload_handler)
+        # 启动帮助
+        start_handler = CommandHandler('start', start)
+        application.add_handler(start_handler)
+        # 重载配置
+        reload_handler = CommandHandler('reload', reload)
+        application.add_handler(reload_handler)
 
     # 初始化115open对象
     if not init.initialize_115open():
-        init.logger.error("115 OpenAPI客户端初始化失败，Bot将继续运行，请通过 /auth 重新授权！")
-        add_task_to_queue(
-            init.bot_config['allowed_user'],
-            None,
-            message="⚠️ 115 OpenAPI 初始化失败，下载/爬虫功能暂不可用。\n请使用 /auth 重新扫码授权，或在 Web UI 中检查 Token 配置。"
-        )
+        init.logger.error("115 OpenAPI客户端初始化失败，服务将继续运行；如启用 Telegram，可通过 /auth 重新授权。")
+        if tg_enabled:
+            add_task_to_queue(
+                init.bot_config['allowed_user'],
+                None,
+                message="⚠️ 115 OpenAPI 初始化失败，下载/爬虫功能暂不可用。\n请使用 /auth 重新扫码授权，或在 Web UI 中检查 Token 配置。"
+            )
 
 
-    # 注册下载
-    register_download_handlers(application)
-    # 注册离线任务
-    register_offline_task_handlers(application)
-    # 手动爬虫
-    register_crawl_handlers(application)
-    # 115扫码授权
-    register_auth_115_handlers(application)
-    # 注册视频
-    register_video_handlers(application)
+    if tg_enabled:
+        # 注册下载
+        register_download_handlers(application)
+        # 注册离线任务
+        register_offline_task_handlers(application)
+        # 手动爬虫
+        register_crawl_handlers(application)
+        # 115扫码授权
+        register_auth_115_handlers(application)
+        # 注册视频
+        register_video_handlers(application)
 
     init.logger.info(f"USER_AGENT: {init.USER_AGENT}")
 
@@ -230,8 +255,13 @@ if __name__ == '__main__':
         init.logger.info("订阅线程启动成功！")
         start_web_server_in_thread()
         time.sleep(3)  # 等待订阅线程启动
-        send_start_message()
-        application.run_polling()  # 阻塞运行
+        if tg_enabled:
+            send_start_message()
+            application.run_polling()  # 阻塞运行
+        else:
+            init.logger.info("Telegram Bot 未启用，Web API 和调度器保持运行。")
+            while True:
+                time.sleep(3600)
     except KeyboardInterrupt:
         init.logger.info("程序已被用户终止（Ctrl+C）。")
     except SystemExit:

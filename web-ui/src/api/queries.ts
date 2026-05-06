@@ -4,7 +4,6 @@ import type {
   DashboardStatsDto,
   OfflineTaskDto,
   SehuaListResponseDto,
-  StrategyRuleDto,
   SystemStatusDto,
   TrendResponseDto,
 } from "./dto";
@@ -12,17 +11,13 @@ import {
   mapDashboardStats,
   mapOfflineTask,
   mapSehuaListResponse,
-  mapStrategyRule,
   mapSystemStatus,
-  toStrategyRuleInputDto,
 } from "./mappers";
 import type {
   CrawlStatus,
   DashboardStats,
   OfflineTask,
   SehuaListResponse,
-  StrategyRule,
-  StrategyRuleInput,
   SystemStatus,
   TrendResponse,
 } from "./types";
@@ -33,11 +28,6 @@ type SehuaListParams = {
   section?: string;
   status?: string;
   keyword?: string;
-};
-
-type StrategyTestPayload = {
-  pattern: string;
-  title: string;
 };
 
 type CrawlTriggerPayload = {
@@ -76,18 +66,8 @@ export const sehuaApi = {
 };
 
 export const strategyApi = {
-  list: async () => {
-    const response = (await api.get<{ items: StrategyRuleDto[] }>("/api/strategy/rules")).data;
-    return { items: response.items.map(mapStrategyRule) };
-  },
-  create: async (rule: StrategyRuleInput) => (await api.post("/api/strategy/rules", toStrategyRuleInputDto(rule))).data,
-  update: async (id: number, rule: StrategyRuleInput) =>
-    (await api.put(`/api/strategy/rules/${id}`, toStrategyRuleInputDto(rule))).data,
-  delete: async (id: number) => (await api.delete(`/api/strategy/rules/${id}`)).data,
-  toggleActive: async (id: number, active: boolean) =>
-    (await api.patch(`/api/strategy/rules/${id}/active`, { active })).data,
-  test: async (payload: StrategyTestPayload) =>
-    (await api.post<{ matched: boolean }>("/api/strategy/test", payload)).data,
+  test: async (pattern: string, title: string) =>
+    (await api.post<{ matched: boolean }>("/api/strategy/test", { pattern, title })).data,
 };
 
 export const tasksApi = {

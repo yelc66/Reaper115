@@ -12,10 +12,21 @@ import init
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Flaresolverr 配置
-FLARESOLVERR_URL = os.getenv("FLARESOLVERR_URL", "http://flaresolverr:8191/v1")
-# 远程 Selenium 配置
-REMOTE_SELENIUM_URL = os.getenv("REMOTE_SELENIUM_URL", None)
+def _remote_selenium_url():
+    """优先 config.yaml sehuatang_spider.remote_selenium_url（仅填 host），再读环境变量。"""
+    val = (init.bot_config.get("sehuatang_spider") or {}).get("remote_selenium_url") or ""
+    host = (val or os.getenv("REMOTE_SELENIUM_URL") or "").rstrip("/")
+    if not host:
+        return None
+    return host if host.endswith("/wd/hub") else f"{host}/wd/hub"
+
+def _flaresolverr_url():
+    """优先 config.yaml sehuatang_spider.flaresolverr_url（仅填 host），再读环境变量。"""
+    val = (init.bot_config.get("sehuatang_spider") or {}).get("flaresolverr_url") or ""
+    host = (val or os.getenv("FLARESOLVERR_URL") or "").rstrip("/")
+    if not host:
+        host = "http://flaresolverr:8191"
+    return host if host.endswith("/v1") else f"{host}/v1"
 
 
 def _build_chrome_options():
@@ -28,14 +39,15 @@ def _build_chrome_options():
 
 def check_browser_health(timeout=15):
     """启动时检查远程 Selenium 浏览器是否能创建并执行一个基础会话。"""
-    if not REMOTE_SELENIUM_URL:
+    remote_url = _remote_selenium_url()
+    if not remote_url:
         return False, "未配置 REMOTE_SELENIUM_URL，无法连接远程 Selenium 浏览器"
 
     driver = None
     try:
-        init.logger.info(f"正在检查远程 Selenium 浏览器: {REMOTE_SELENIUM_URL} ...")
+        init.logger.info(f"正在检查远程 Selenium 浏览器: {remote_url} ...")
         driver = webdriver.Remote(
-            command_executor=REMOTE_SELENIUM_URL,
+            command_executor=remote_url,
             options=_build_chrome_options()
         )
         driver.set_page_load_timeout(timeout)
@@ -71,17 +83,18 @@ class SeleniumBrowser:
         await asyncio.get_running_loop().run_in_executor(self.executor, self._init_driver)
 
     def _init_driver(self):
-        if not REMOTE_SELENIUM_URL:
+        remote_url = _remote_selenium_url()
+        if not remote_url:
             self.last_error = "未配置 REMOTE_SELENIUM_URL，无法连接远程 Selenium 浏览器"
             init.logger.error(self.last_error)
             return
 
         try:
             self.last_error = None
-            init.logger.info(f"正在连接远程 Selenium: {REMOTE_SELENIUM_URL} ...")
+            init.logger.info(f"正在连接远程 Selenium: {remote_url} ...")
 
             self.driver = webdriver.Remote(
-                command_executor=REMOTE_SELENIUM_URL,
+                command_executor=remote_url,
                 options=_build_chrome_options()
             )
             user_agent = self.driver.execute_script("return navigator.userAgent")
@@ -200,8 +213,9 @@ class SeleniumBrowser:
             }
             headers = {"Content-Type": "application/json"}
 
-            init.logger.info(f"请求 Flaresolverr: {FLARESOLVERR_URL}")
-            response = requests.post(FLARESOLVERR_URL, json=payload, headers=headers, timeout=125)
+            flareSolverr = _flaresolverr_url()
+            init.logger.info(f"请求 Flaresolverr: {flareSolverr}")
+            response = requests.post(flareSolverr, json=payload, headers=headers, timeout=125)
             resp_data = response.json()
 
             if resp_data.get("status") == "ok":

@@ -49,10 +49,12 @@ def _is_authorized(candidate: str | None) -> bool:
 
 
 def create_app():
+    install_log_buffer()
     app = FastAPI(title="Telegram-115Bot Web API", version="0.1.0")
 
     @app.on_event("startup")
     def check_browser_on_startup():
+        install_log_buffer()
         if not init.bot_config.get("sehuatang_spider", {}).get("enable", False):
             init.logger.info("启动浏览器检测跳过：涩花爬虫未启用")
             return
@@ -119,8 +121,12 @@ def create_app():
 
 
 def _run_web_server(host: str, port: int):
-    config = uvicorn.Config(create_app(), host=host, port=port, log_level="info")
-    install_log_buffer()  # must be after Config() since it calls configure_logging which resets root handlers
+    class _Config(uvicorn.Config):
+        def configure_logging(self) -> None:
+            super().configure_logging()
+            install_log_buffer()  # re-install after every uvicorn logging reset
+
+    config = _Config(create_app(), host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     server.run()
 

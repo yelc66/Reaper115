@@ -42,18 +42,13 @@ export type SehuaListResponse = {
   items: SehuaItem[];
 };
 
-export type StrategyRule = {
-  id: number;
-  site: string;
-  sectionName: string;
+export type SectionRule = {
   name: string;
   pattern: string;
-  savePath?: string | null;
+  savePath: string;
   kind: "include" | "exclude";
   active: boolean;
 };
-
-export type StrategyRuleInput = Omit<StrategyRule, "id">;
 
 export type OfflineTask = {
   id: number;

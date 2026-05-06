@@ -20,11 +20,14 @@ LOG_BUFFER: deque[dict[str, str]] = deque(maxlen=500)
 class WebLogBufferHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         try:
+            message = self.format(record)
+            if record.exc_info:
+                message = message.rstrip()
             LOG_BUFFER.append(
                 {
                     "time": datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
                     "level": record.levelname,
-                    "message": self.format(record),
+                    "message": message,
                 }
             )
         except Exception:
@@ -33,12 +36,15 @@ class WebLogBufferHandler(logging.Handler):
 
 def install_log_buffer():
     root_logger = logging.getLogger()
-    if any(isinstance(handler, WebLogBufferHandler) for handler in root_logger.handlers):
+    existing = next((handler for handler in root_logger.handlers if isinstance(handler, WebLogBufferHandler)), None)
+    if existing:
+        existing.setLevel(logging.INFO)
+        existing.setFormatter(logging.Formatter("%(message)s"))
         return
 
     handler = WebLogBufferHandler()
     handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"))
+    handler.setFormatter(logging.Formatter("%(message)s"))
     root_logger.addHandler(handler)
 
 

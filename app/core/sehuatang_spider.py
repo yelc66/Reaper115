@@ -1048,13 +1048,13 @@ def save_sehua2db(results):
         init.logger.error(f"保存涩花数据到数据库时出错: {str(e)}")
         
         
-def _get_section_rules(strategy_config, site, section_name):
-    return (strategy_config.get(site) or {}).get(section_name) or []
-
-
-def _active_strategy_rules(strategy_config, section_name):
-    rules = _get_section_rules(strategy_config, 'sehuatang', section_name)
-    return [rule for rule in rules if rule.get('active', True)]
+def _active_strategy_rules(section_name):
+    sections = (init.bot_config.get('sehuatang_spider') or {}).get('sections') or []
+    for sec in sections:
+        if sec.get('name') == section_name:
+            rules = sec.get('rules') or []
+            return [r for r in rules if r.get('active', True)]
+    return []
 
 
 def _rule_matches(rule, title):
@@ -1063,10 +1063,7 @@ def _rule_matches(rule, title):
 
 
 def is_title_allowed(section_name, title):
-    strategy_config = read_yaml_file(init.STRATEGY_FILE)
-    if not strategy_config:
-        return True
-    section_rules = _active_strategy_rules(strategy_config, section_name)
+    section_rules = _active_strategy_rules(section_name)
     if not section_rules:
         return True
     include_rules = [rule for rule in section_rules if rule.get('kind', 'include') == 'include']
@@ -1082,11 +1079,8 @@ def is_title_allowed(section_name, title):
 
 
 def match_strategy(result):
-    strategy_config = read_yaml_file(init.STRATEGY_FILE)
-    if not strategy_config:
-        return True, result.get('save_path')
     section_name = result.get('section_name', '')
-    section_rules = _active_strategy_rules(strategy_config, section_name)
+    section_rules = _active_strategy_rules(section_name)
     if not section_rules:
         return True, result.get('save_path')
     title = result.get('title', '')

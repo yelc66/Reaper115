@@ -3,6 +3,7 @@
 import asyncio
 import json
 import threading
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -38,6 +39,15 @@ def _run_crawl(crawl_mode: str):
         init.CRAWL_SEHUA_STATUS = 0
 
 
+def _ts() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _buf(level: str, message: str):
+    """Write directly to LOG_BUFFER (bypasses logging handlers)."""
+    LOG_BUFFER.append({"time": _ts(), "level": level, "message": message})
+
+
 @router.post("/trigger")
 def trigger_crawl(payload: CrawlTriggerRequest):
     init.logger.info(
@@ -58,6 +68,9 @@ def trigger_crawl(payload: CrawlTriggerRequest):
     thread.start()
     crawl_label = CRAWL_MODE_LABELS.get(crawl_mode, crawl_mode)
     init.logger.info(f"Web API triggered sehua crawl: {crawl_label}")
+
+    _buf("INFO", f"抓取已触发：{crawl_label}")
+
     return {"ok": True, "mode": crawl_mode, "date": crawl_label}
 
 
@@ -69,8 +82,15 @@ def crawl_status():
 @router.get("/logs")
 async def stream_logs(request: Request):
     async def generate():
+        # Immediately send a handshake so we can verify the SSE pipeline is alive
+        yield {
+            "event": "log",
+            "id": "0",
+            "data": json.dumps({"time": _ts(), "level": "INFO", "message": "SSE 连接成功"}, ensure_ascii=False),
+        }
+
         index = max(len(LOG_BUFFER) - 50, 0)
-        event_id = 0
+        event_id = 1
         while True:
             if await request.is_disconnected():
                 break

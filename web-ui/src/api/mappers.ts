@@ -3,8 +3,6 @@ import type {
   OfflineTaskDto,
   SehuaItemDto,
   SehuaListResponseDto,
-  StrategyRuleDto,
-  StrategyRuleInputDto,
   SystemStatusDto,
 } from "./dto";
 import type {
@@ -12,8 +10,6 @@ import type {
   OfflineTask,
   SehuaItem,
   SehuaListResponse,
-  StrategyRule,
-  StrategyRuleInput,
   SystemStatus,
 } from "./models";
 
@@ -57,31 +53,6 @@ export function mapSehuaListResponse(response: SehuaListResponseDto): SehuaListR
     size: response.size,
     total: response.total,
     items: response.items.map(mapSehuaItem),
-  };
-}
-
-export function mapStrategyRule(rule: StrategyRuleDto): StrategyRule {
-  return {
-    id: rule.id,
-    site: rule.site,
-    sectionName: rule.section_name,
-    name: rule.name,
-    pattern: rule.pattern,
-    savePath: rule.save_path,
-    kind: rule.kind === "exclude" ? "exclude" : "include",
-    active: rule.active !== false,
-  };
-}
-
-export function toStrategyRuleInputDto(rule: StrategyRuleInput): StrategyRuleInputDto {
-  return {
-    site: rule.site,
-    section_name: rule.sectionName,
-    name: rule.name,
-    pattern: rule.pattern,
-    save_path: rule.savePath,
-    kind: rule.kind,
-    active: rule.active,
   };
 }
 

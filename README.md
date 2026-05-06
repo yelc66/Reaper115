@@ -45,11 +45,17 @@ Reaper115 是一个基于 Python 的 Telegram Bot 项目，聚焦涩花资源自
    cp app/config.yaml.example config/config.yaml
    ```
 
-   编辑 `config/config.yaml`，至少需要填写：
+   编辑 `config/config.yaml`，以下字段为**必填项**：
 
-   - `bot_token`：Telegram Bot Token
-   - `allowed_user`：允许使用 Bot 的 Telegram 用户 ID
-   - `115_app_id`：115 Open Platform App ID
+   | 配置项 | 说明 |
+   | --- | --- |
+   | `bot_token` | Telegram Bot Token |
+   | `allowed_user` | 允许使用 Bot 的 Telegram 用户 ID |
+   | `115_app_id` | 115 Open Platform App ID |
+   | `access_token` / `refresh_token` | 115 授权令牌（与 `115_app_id` 二选一填写：直接粘贴已有 Token，或填写 `115_app_id` 后通过 Web UI 扫码登录自动获取）|
+   | `sehuatang_spider.flaresolverr_url` | FlareSolverr 服务地址（与 `remote_selenium_url` 二选一，推荐使用此方式）|
+   | `sehuatang_spider.remote_selenium_url` | 远程 Selenium 地址（与 `flaresolverr_url` 二选一）|
+   | `sehuatang_spider.sections` | 要抓取的分区，默认已配置 `高清中文字幕`，按需修改 `save_path` |
 
 2. **启动服务**
 
@@ -74,7 +80,7 @@ Reaper115 是一个基于 Python 的 Telegram Bot 项目，聚焦涩花资源自
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 mkdir -p config tmp
 cp app/config.yaml.example config/config.yaml
-# 在 config/config.yaml 中填写 bot_token、allowed_user、115_app_id
+# 按上方「必填项」表格填写 config/config.yaml
 TG115_DEBUG=1 python app/115bot.py
 ```
 
