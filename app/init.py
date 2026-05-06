@@ -18,7 +18,7 @@ def _ensure_module_paths():
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
     required_paths = [current_dir, os.path.dirname(current_dir)]
-    
+
     for path in required_paths:
         if path not in sys.path:
             sys.path.insert(0, path)
@@ -29,6 +29,25 @@ _ensure_module_paths()
 from app.utils.logger import Logger
 from app.utils.sqlitelib import *
 
+
+def _load_dotenv():
+    """本地开发时从项目根目录的 .env 加载环境变量，不覆盖已有值。Docker 环境中文件不存在则静默跳过。"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_path = os.path.join(root, ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+_load_dotenv()
 
 # 调试模式。本地开发用 TG115_DEBUG=1 时读取项目内 config/tmp/app 路径。
 debug_mode = os.getenv("TG115_DEBUG", "").lower() in ("1", "true", "yes", "on")
@@ -59,8 +78,6 @@ STRATEGY_FILE = "/config/crawling_strategy.yaml"
 TG_SESSION_FILE = "/config/user_session.session"
 # DB File
 DB_FILE = "/config/db.db"
-# 115 Token File
-TOKEN_FILE = "/config/115_tokens.json"
 # APP path
 APP = "/app"
 # Config path
@@ -77,7 +94,7 @@ def _get_system_chrome_version():
         if res.returncode == 0:
              # Output: "Google Chrome 121.0.6167.85"
             return res.stdout.strip().split()[-1]
-            
+
         # 2. 尝试获取 chromium 版本
         res = subprocess.run(['chromium', '--version'], capture_output=True, text=True, check=False)
         if res.returncode == 0:
@@ -98,7 +115,6 @@ if debug_mode:
     STRATEGY_FILE = "config/crawling_strategy.yaml"
     TG_SESSION_FILE = "config/user_session.session"
     DB_FILE = "config/db.db"
-    TOKEN_FILE = "config/115_tokens.json"
     APP = "app"
     CONFIG = "config"
     TEMP = "tmp"
@@ -134,7 +150,7 @@ def load_yaml_config():
     """
     global bot_config, CONFIG_FILE, CONFIG_FILE_EXAMPLE, APP
     yaml_path = CONFIG_FILE
-    
+
     example_config_path = f"{APP}/config.yaml.example"
     # 尝试更新示例配置文件
     try:
@@ -182,6 +198,33 @@ def get_bot_token():
             bot_config = yaml.load(cfg, Loader=yaml.FullLoader)
             bot_token = bot_config['bot_token']
         return bot_token
+
+def save_tokens_to_config(access_token: str, refresh_token: str):
+    """将 access_token / refresh_token 写入 bot_config 并持久化到 config.yaml。
+    用逐行替换而非整体 dump，保持文件其余内容和格式不变。"""
+    import re
+    global bot_config
+    bot_config['access_token'] = access_token
+    bot_config['refresh_token'] = refresh_token
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            content = f.read()
+        for key, val in (('access_token', access_token), ('refresh_token', refresh_token)):
+            # 匹配 "key: 任意值（到行尾）"，替换为带引号的新值
+            content = re.sub(
+                rf'^{key}:.*$',
+                f'{key}: "{val}"',
+                content,
+                flags=re.MULTILINE,
+            )
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            f.write(content)
+        if logger:
+            logger.info("Tokens saved to config.yaml")
+    except Exception as e:
+        if logger:
+            logger.error(f"保存token到config.yaml失败: {e}")
+
 
 def create_tmp():
     if not os.path.exists(TEMP):
@@ -259,7 +302,7 @@ def init_db():
         );
         '''
         sqlite.execute_sql(create_table_query)
-        
+
         create_table_query = """
         CREATE TABLE IF NOT EXISTS av_daily_update (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,7 +317,7 @@ def init_db():
         );
         """
         sqlite.execute_sql(create_table_query)
-        
+
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS sub_movie (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -291,7 +334,7 @@ def init_db():
         );
         '''
         sqlite.execute_sql(create_table_query)
-        
+
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS sehua_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,7 +347,7 @@ def init_db():
             post_url TEXT, -- 封面url
             publish_date DATETIME, -- 发布时间
             pub_url TEXT, -- 资源链接
-            image_path TEXT, -- 图片本地路径 
+            image_path TEXT, -- 图片本地路径
             save_path TEXT, -- 保存路径
             is_download TINYINT DEFAULT 0, -- 0=未提交 1=已提交离线 2=115下载完成+后处理完成
             submitted_at DATETIME, -- 提交离线时间
@@ -312,11 +355,6 @@ def init_db():
         );
         '''
         sqlite.execute_sql(create_table_query)
-        # 兼容旧表：补充新字段（字段已存在时忽略错误）
-        try:
-            sqlite.execute_sql("ALTER TABLE sehua_data ADD COLUMN submitted_at DATETIME")
-        except Exception:
-            pass
 
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS t66y (
@@ -334,7 +372,7 @@ def init_db():
         );
         '''
         sqlite.execute_sql(create_table_query)
-        
+
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS javbus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -354,7 +392,7 @@ def init_db():
         '''
         sqlite.execute_sql(create_table_query)
         logger.info("init DataBase success.")
-        
+
 
 def init_log():
     create_logger()

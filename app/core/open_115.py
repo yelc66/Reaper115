@@ -92,26 +92,18 @@ class OpenAPI_115:
         
     def get_token(self):
         if not self.refresh_token or not self.access_token:
-            if not os.path.exists(init.TOKEN_FILE):
-                app_id = init.bot_config.get('115_app_id')
-                if app_id and str(app_id).lower() != "your_115_app_id":
-                    init.logger.info("正在进入PKCE授权流程，获取refresh_token...")
-                    self.auth_pkce(init.bot_config['allowed_user'], app_id)
-                else:
-                    _access_token = init.bot_config.get('access_token', '')
-                    _refresh_token = init.bot_config.get('refresh_token', '')
-                    if _access_token and _refresh_token and \
-                       _access_token.lower() != "your_access_token" and \
-                       _refresh_token.lower() != "your_refresh_token":
-                        self.access_token = _access_token
-                        self.refresh_token = _refresh_token
-                        init.logger.info("使用配置文件中的access_token和refresh_token")
-                        self.save_token_to_file(self.access_token, self.refresh_token, init.TOKEN_FILE)
-            with open(init.TOKEN_FILE, 'r', encoding='utf-8') as f:
-                tokens = json.load(f)
-                # 从文件中读取access_token和refresh_token
-                self.access_token = tokens.get('access_token', '')
-                self.refresh_token = tokens.get('refresh_token', '')
+            app_id = init.bot_config.get('115_app_id')
+            _access_token = init.bot_config.get('access_token', '')
+            _refresh_token = init.bot_config.get('refresh_token', '')
+            if _access_token and _refresh_token and \
+               _access_token.lower() not in ('', 'your_access_token') and \
+               _refresh_token.lower() not in ('', 'your_refresh_token'):
+                self.access_token = _access_token
+                self.refresh_token = _refresh_token
+                init.logger.info("使用配置文件中的access_token和refresh_token")
+            elif app_id and str(app_id).lower() not in ('', 'your_115_app_id'):
+                init.logger.info("正在进入PKCE授权流程，获取refresh_token...")
+                self.auth_pkce(init.bot_config['allowed_user'], app_id)
         
         
     def auth_pkce(self, sub_user, app_id):
@@ -191,7 +183,7 @@ class OpenAPI_115:
                             self.refresh_token = res['data']['refresh_token']
                             self.expires_in = res['data']['expires_in']
                             init.logger.info("access_token获取成功！")
-                            self.save_token_to_file(self.access_token, self.refresh_token, init.TOKEN_FILE)
+                            init.save_tokens_to_config(self.access_token, self.refresh_token)
                             break
               
                         
@@ -265,21 +257,17 @@ class OpenAPI_115:
                 refresh_token = r_data["data"]["refresh_token"]
                 self.access_token = access_token
                 self.refresh_token = refresh_token
-                self.save_token_to_file(access_token, refresh_token, init.TOKEN_FILE)
+                init.save_tokens_to_config(access_token, refresh_token)
                 return {"status": "success", "done": True, "message": "授权成功！"}
             return {"status": "error", "done": True, "message": "获取token失败"}
 
         return {"status": "waiting", "done": False, "message": "等待扫码..."}
 
     def _load_token_from_file(self):
-        if os.path.exists(init.TOKEN_FILE):
-            try:
-                with open(init.TOKEN_FILE, 'r', encoding='utf-8') as f:
-                    tokens = json.load(f)
-                    return tokens.get('access_token', ''), tokens.get('refresh_token', '')
-            except Exception as e:
-                init.logger.warn(f"读取Token文件失败: {e}")
-        return "", ""
+        return (
+            init.bot_config.get('access_token', ''),
+            init.bot_config.get('refresh_token', ''),
+        )
 
     def refresh_access_token(self):
         with self.refresh_lock:
@@ -318,7 +306,7 @@ class OpenAPI_115:
                 if isinstance(token_data, dict) and token_data.get('access_token'):
                     self.access_token = token_data['access_token']
                     self.refresh_token = token_data['refresh_token']
-                    self.save_token_to_file(self.access_token, self.refresh_token, init.TOKEN_FILE)
+                    init.save_tokens_to_config(self.access_token, self.refresh_token)
                     init.logger.info("Access token 更新成功.")
                 else:
                     init.logger.warn(f"Access token 更新失败: 响应数据异常 - {res}")
@@ -1557,10 +1545,8 @@ class OpenAPI_115:
             
     @staticmethod
     def save_token_to_file(access_token: str, refresh_token: str, file_path: str):
-        """将access_token和refresh_token保存到文件"""
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump({"access_token": access_token, "refresh_token": refresh_token}, f)
-        init.logger.info(f"Tokens saved to {file_path}")
+        """已废弃，保留仅防外部调用报错"""
+        init.save_tokens_to_config(access_token, refresh_token)
         
     @staticmethod
     def get_challenge() -> str:

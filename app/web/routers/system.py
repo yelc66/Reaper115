@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import os
-import json
 import asyncio
+import json
 
 import requests
 from fastapi import APIRouter, HTTPException
@@ -25,7 +24,6 @@ def _has_real_value(value, placeholder: str) -> bool:
 
 @router.get("/status")
 def system_status():
-    token_file_exists = os.path.exists(init.TOKEN_FILE)
     openapi_ready = False
     user_info = None
     if init.openapi_115 is not None:
@@ -37,14 +35,12 @@ def system_status():
 
     return {
         "openapi_ready": openapi_ready,
-        "token_file_exists": token_file_exists,
         "crawl_running": init.CRAWL_SEHUA_STATUS == 1,
         "debug_mode": init.debug_mode,
         "paths": {
             "config": init.CONFIG_FILE,
             "strategy": init.STRATEGY_FILE,
             "db": init.DB_FILE,
-            "token": init.TOKEN_FILE,
         },
         "user_info": user_info,
     }
@@ -90,22 +86,6 @@ def test_telegram_config():
     }
 
 
-def _load_115_tokens():
-    try:
-        if os.path.exists(init.TOKEN_FILE):
-            with open(init.TOKEN_FILE, "r", encoding="utf-8") as token_file:
-                return json.load(token_file) or {}
-    except Exception as exc:
-        init.logger.warn(f"读取115 Token文件失败: {exc}")
-    return {}
-
-
-def _save_115_tokens(access_token: str, refresh_token: str):
-    os.makedirs(os.path.dirname(init.TOKEN_FILE), exist_ok=True)
-    with open(init.TOKEN_FILE, "w", encoding="utf-8") as token_file:
-        json.dump({"access_token": access_token, "refresh_token": refresh_token}, token_file)
-
-
 def _test_115_user_info(access_token: str):
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -135,7 +115,7 @@ def _refresh_115_access_token(refresh_token: str):
         access_token = token_data.get("access_token")
         new_refresh_token = token_data.get("refresh_token")
         if access_token and new_refresh_token:
-            _save_115_tokens(access_token, new_refresh_token)
+            init.save_tokens_to_config(access_token, new_refresh_token)
             if init.openapi_115 is not None:
                 init.openapi_115.access_token = access_token
                 init.openapi_115.refresh_token = new_refresh_token
@@ -146,14 +126,13 @@ def _refresh_115_access_token(refresh_token: str):
 
 @router.post("/test/115")
 def test_115_config():
-    token_file = _load_115_tokens()
-    access_token = init.bot_config.get("access_token", "")
-    refresh_token = init.bot_config.get("refresh_token", "")
+    access_token = init.bot_config.get("access_token", "") or getattr(init.openapi_115, "access_token", "")
+    refresh_token = init.bot_config.get("refresh_token", "") or getattr(init.openapi_115, "refresh_token", "")
 
     if not _has_real_value(access_token, "your_access_token"):
-        access_token = token_file.get("access_token") or getattr(init.openapi_115, "access_token", "")
+        access_token = ""
     if not _has_real_value(refresh_token, "your_refresh_token"):
-        refresh_token = token_file.get("refresh_token") or getattr(init.openapi_115, "refresh_token", "")
+        refresh_token = ""
 
     if not access_token:
         app_id = init.bot_config.get("115_app_id", "")

@@ -1,12 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, CheckCircle2, Clock3, FolderOpen, RotateCcw, ServerCog } from "lucide-react";
-import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Activity,
+  CheckCircle2,
+  Clock3,
+  Cpu,
+  Database,
+  HardDrive,
+  RotateCcw,
+  Server,
+  Wifi,
+} from "lucide-react";
+import {
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 
 import { dashboardApi, systemApi } from "../api/queries";
-import { Badge, Card, ErrorState, LoadingState, PageHeader } from "../components/ui";
+import { Badge, Card, ErrorState, LoadingState, PageHeader, StatCard } from "../components/ui";
 import { errorMessage, formatDateTime, formatNumber } from "../lib/utils";
 
-const CHART_PALETTE = ["#007AFF", "#5ACBFA", "#B0D9FF", "#34C759", "#5856D6", "#FF9500", "#8E8E93"];
+const CHART_PALETTE = ["#007AFF", "#34C759", "#FF9500", "#AF52DE", "#5856D6", "#8E8E93"];
 
 export function Dashboard() {
   const statsQuery = useQuery({ queryKey: ["dashboard", "stats"], queryFn: dashboardApi.stats });
@@ -21,113 +39,131 @@ export function Dashboard() {
   if (statsQuery.isError) return <ErrorState message={errorMessage(statsQuery.error)} />;
   if (trendQuery.isError) return <ErrorState message={errorMessage(trendQuery.error)} />;
 
-  const cards = [
-    { label: "资源总数", value: statsQuery.data.total, icon: BarChart3, tone: "text-primary" },
-    { label: "已离线", value: statsQuery.data.downloaded, icon: CheckCircle2, tone: "text-emerald-400" },
-    { label: "待处理", value: statsQuery.data.pending, icon: Clock3, tone: "text-amber-400" },
-    { label: "重试队列", value: statsQuery.data.retryPending, icon: RotateCcw, tone: "text-rose-400" },
-  ];
-
   return (
     <>
-      <section className="mb-5 rounded-lg border border-white/70 bg-white/54 p-5 shadow-glass backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
-        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-lg font-semibold">
-              <ServerCog className="h-5 w-5 text-primary" />
-              系统状态
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">OpenAPI、Token、爬虫和运行路径状态，每 10 秒自动刷新</p>
-          </div>
-          {statusQuery.data ? (
-            <Badge tone={statusQuery.data.openapiReady && statusQuery.data.tokenFileExists ? "success" : "warning"}>
-              {statusQuery.data.openapiReady && statusQuery.data.tokenFileExists ? "基础服务正常" : "需要检查配置"}
-            </Badge>
-          ) : null}
-        </div>
+      <PageHeader
+        title="仪表盘"
+        description="查看系统状态、抓取吞吐和最近活动。"
+      />
 
-        {statusQuery.isPending ? <LoadingState /> : null}
-        {statusQuery.isError ? <ErrorState message={errorMessage(statusQuery.error)} /> : null}
-        {statusQuery.data ? (
-          <div className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
-            <div className="rounded-lg border border-white/70 bg-white/58 p-4 shadow-panel backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
-              <h2 className="mb-4 text-sm font-semibold">运行状态</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <StatusLine label="115 OpenAPI" active={statusQuery.data.openapiReady} />
-                <StatusLine label="Token 文件" active={statusQuery.data.tokenFileExists} />
-                <StatusLine
-                  label="爬虫状态"
-                  active={statusQuery.data.crawlRunning}
-                  activeText="运行中"
-                  inactiveText="空闲"
-                />
-                <StatusLine
-                  label="调试模式"
-                  active={statusQuery.data.debugMode}
-                  activeText="开启"
-                  inactiveText="关闭"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-white/70 bg-white/58 p-4 shadow-panel backdrop-blur-xl dark:border-white/10 dark:bg-white/10">
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold">
-                <FolderOpen className="h-4 w-4 text-primary" />
-                路径
-              </h2>
-              <div className="grid gap-3 text-xs md:grid-cols-2">
-                {Object.entries(statusQuery.data.paths ?? {}).map(([key, value]) => (
-                  <div key={key} className="min-w-0 rounded-md bg-white/46 p-3 dark:bg-white/5">
-                    <div className="mb-1 text-muted-foreground">{key}</div>
-                    <div className="break-all font-mono leading-5">{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <PageHeader title="Dashboard" description="资源入库、离线状态和最近抓取活动概览" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((item) => (
-          <Card key={item.label}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-muted-foreground">{item.label}</div>
-                <div className="mt-2 text-3xl font-semibold">{formatNumber(item.value)}</div>
-              </div>
-              <item.icon className={`h-8 w-8 ${item.tone}`} />
-            </div>
-          </Card>
-        ))}
-      </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+      {/* ── System + stat cards row ── */}
+      <div className="mb-4 grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
+        {/* System status */}
         <Card>
-          <h2 className="mb-4 text-base font-semibold">30 日趋势</h2>
-          <div className="h-80">
+          <h2 className="mb-3 text-base font-semibold">系统状态</h2>
+          {statusQuery.isPending ? <LoadingState /> : null}
+          {statusQuery.isError ? <ErrorState message={errorMessage(statusQuery.error)} /> : null}
+          {statusQuery.data ? (
+            <div className="flex flex-col gap-1.5">
+              <InsetRow
+                icon={<Server className="h-4 w-4" />}
+                label="API"
+                badge={<Badge tone="success">在线</Badge>}
+              />
+              <InsetRow
+                icon={<Database className="h-4 w-4" />}
+                label="数据库"
+                badge={<Badge tone="success">在线</Badge>}
+              />
+              <InsetRow
+                icon={<Wifi className="h-4 w-4" />}
+                label="115 OpenAPI"
+                badge={
+                  <Badge tone={statusQuery.data.openapiReady ? "success" : "warning"}>
+                    {statusQuery.data.openapiReady ? "已连接" : "检查配置"}
+                  </Badge>
+                }
+              />
+              <InsetRow
+                icon={<Activity className="h-4 w-4" />}
+                label="爬虫"
+                badge={
+                  <Badge tone={statusQuery.data.crawlRunning ? "info" : "default"}>
+                    {statusQuery.data.crawlRunning ? "运行中" : "空闲"}
+                  </Badge>
+                }
+              />
+              <InsetRow
+                icon={<Cpu className="h-4 w-4" />}
+                label="调试模式"
+                badge={
+                  <Badge tone={statusQuery.data.debugMode ? "warning" : "default"}>
+                    {statusQuery.data.debugMode ? "开启" : "关闭"}
+                  </Badge>
+                }
+              />
+            </div>
+          ) : null}
+        </Card>
+
+        {/* 2×2 stat cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard
+            label="资源总数"
+            value={formatNumber(statsQuery.data.total)}
+            icon={<Activity className="h-8 w-8" />}
+            tone="primary"
+          />
+          <StatCard
+            label="已下载"
+            value={formatNumber(statsQuery.data.downloaded)}
+            icon={<CheckCircle2 className="h-8 w-8" />}
+            tone="success"
+          />
+          <StatCard
+            label="待处理"
+            value={formatNumber(statsQuery.data.pending)}
+            icon={<Clock3 className="h-8 w-8" />}
+            tone="warning"
+          />
+          <StatCard
+            label="失败重试"
+            value={formatNumber(statsQuery.data.retryPending)}
+            icon={<RotateCcw className="h-8 w-8" />}
+            tone="danger"
+          />
+        </div>
+      </div>
+
+      {/* ── Charts row ── */}
+      <div className="mb-4 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">近 30 天抓取量</h2>
+            <Badge tone="info">帖子/天</Badge>
+          </div>
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendQuery.data.items}>
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#8F8F8F" }} axisLine={false} tickLine={false} />
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(255,255,255,0.8)",
+                    border: "1px solid rgba(255,255,255,0.7)",
+                    borderRadius: 8,
+                    backdropFilter: "blur(20px)",
+                  }}
+                />
                 <Line type="monotone" dataKey="total" name="总数" stroke="#007AFF" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="downloaded" name="已离线" stroke="#34C759" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="downloaded" name="已下载" stroke="#34C759" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </Card>
+
         <Card>
-          <h2 className="mb-4 text-base font-semibold">版块分布</h2>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">板块占比</h2>
+            <Badge>全部时间</Badge>
+          </div>
+          <div className="flex h-56 items-center justify-center gap-6">
+            <ResponsiveContainer width={140} height={140}>
               <PieChart>
                 <Pie
                   data={statsQuery.data.bySection}
                   dataKey="total"
                   nameKey="sectionName"
-                  innerRadius={60}
-                  outerRadius={105}
+                  innerRadius={38}
+                  outerRadius={60}
                   paddingAngle={2}
                 >
                   {statsQuery.data.bySection.map((section, index) => (
@@ -137,32 +173,49 @@ export function Dashboard() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            <div className="flex flex-col gap-1.5 text-xs">
+              {statsQuery.data.bySection.slice(0, 5).map((section, index) => (
+                <div key={section.sectionName} className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: CHART_PALETTE[index % CHART_PALETTE.length] }}
+                  />
+                  <span className="min-w-0 truncate text-foreground">{section.sectionName}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
       </div>
-      <Card className="mt-4">
-        <h2 className="mb-4 text-base font-semibold">最近入库</h2>
+
+      {/* ── Recent crawls table ── */}
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold">最近抓取</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="border-b border-border text-left text-muted-foreground">
+          <table className="w-full text-sm">
+            <thead>
               <tr>
-                <th className="py-2 pr-4 font-medium">标题</th>
-                <th className="py-2 pr-4 font-medium">版块</th>
-                <th className="py-2 pr-4 font-medium">状态</th>
-                <th className="py-2 pr-4 font-medium">时间</th>
+                <th className="pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">标题</th>
+                <th className="pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">板块</th>
+                <th className="pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">状态</th>
+                <th className="pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">时间</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {statsQuery.data.recent.map((item) => (
-                <tr key={item.id}>
-                  <td className="max-w-xl py-3 pr-4">{item.title}</td>
-                  <td className="py-3 pr-4">{item.sectionName}</td>
+                <tr key={item.id} className="border-t border-border/60">
+                  <td className="max-w-sm py-3 pr-4 font-medium"><div className="text-cell">{item.title}</div></td>
+                  <td className="py-3 pr-4"><div className="max-w-32 truncate">{item.sectionName}</div></td>
                   <td className="py-3 pr-4">
                     <Badge tone={item.isDownload ? "success" : "warning"}>
-                      {item.isDownload ? "已离线" : "待处理"}
+                      {item.isDownload ? "已下载" : "待处理"}
                     </Badge>
                   </td>
-                  <td className="py-3 pr-4 text-muted-foreground">{formatDateTime(item.createdAt)}</td>
+                  <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
+                    {formatDateTime(item.createdAt)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -173,21 +226,22 @@ export function Dashboard() {
   );
 }
 
-function StatusLine({
+function InsetRow({
+  icon,
   label,
-  active,
-  activeText = "正常",
-  inactiveText = "异常",
+  badge,
 }: {
+  icon: React.ReactNode;
   label: string;
-  active: boolean;
-  activeText?: string;
-  inactiveText?: string;
+  badge: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-white/46 px-3 py-2 dark:bg-white/5">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <Badge tone={active ? "success" : "warning"}>{active ? activeText : inactiveText}</Badge>
+    <div className="inset-row">
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {badge}
     </div>
   );
 }

@@ -84,6 +84,8 @@ export const strategyApi = {
   update: async (id: number, rule: StrategyRuleInput) =>
     (await api.put(`/api/strategy/rules/${id}`, toStrategyRuleInputDto(rule))).data,
   delete: async (id: number) => (await api.delete(`/api/strategy/rules/${id}`)).data,
+  toggleActive: async (id: number, active: boolean) =>
+    (await api.patch(`/api/strategy/rules/${id}/active`, { active })).data,
   test: async (payload: StrategyTestPayload) =>
     (await api.post<{ matched: boolean }>("/api/strategy/test", payload)).data,
 };

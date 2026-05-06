@@ -1,28 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Play, Radio } from "lucide-react";
+import { Calendar, Play, Square } from "lucide-react";
 
-import { API_BASE_URL } from "../api/client";
+import { API_BASE_URL, getStoredAuthKey } from "../api/client";
 import { crawlApi } from "../api/queries";
-import { Badge, Button, Card, ErrorState, PageHeader } from "../components/ui";
+import { Badge, Button, Card, ErrorState, Field, Input, PageHeader } from "../components/ui";
 import { errorMessage } from "../lib/utils";
 
-type LogItem = {
-  time: string;
-  level: string;
-  message: string;
-};
+type LogItem = { time: string; level: string; message: string };
 
-const datePresets = [
-  { label: "今天", mode: "today" },
-  { label: "昨天", mode: "yesterday" },
-  { label: "七天", mode: "7days" },
+const PRESETS = [
+  { id: "today",     label: "今天" },
+  { id: "yesterday", label: "昨天" },
+  { id: "7days",     label: "近 7 天" },
+  { id: "custom",    label: "自定义" },
 ] as const;
 
+type PresetId = (typeof PRESETS)[number]["id"];
+
 export function Crawl() {
-  const [crawlMode, setCrawlMode] = useState<(typeof datePresets)[number]["mode"]>("today");
+  const [preset, setPreset] = useState<PresetId>("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [logs, setLogs] = useState<LogItem[]>([]);
-  const logContainerRef = useRef<HTMLDivElement | null>(null);
+  const logRef = useRef<HTMLDivElement | null>(null);
+
   const statusQuery = useQuery({
     queryKey: ["crawl", "status"],
     queryFn: crawlApi.status,
@@ -34,7 +36,11 @@ export function Crawl() {
   });
 
   useEffect(() => {
-    const source = new EventSource(`${API_BASE_URL}/api/crawl/logs`);
+    const authKey = getStoredAuthKey();
+    const url = authKey
+      ? `${API_BASE_URL}/api/crawl/logs?key=${encodeURIComponent(authKey)}`
+      : `${API_BASE_URL}/api/crawl/logs`;
+    const source = new EventSource(url);
     source.addEventListener("log", (event) => {
       const item = JSON.parse((event as MessageEvent).data) as LogItem;
       setLogs((current) => [...current.slice(-199), item]);
@@ -43,82 +49,130 @@ export function Crawl() {
   }, []);
 
   useEffect(() => {
-    logContainerRef.current?.scrollTo({ top: logContainerRef.current.scrollHeight });
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [logs]);
+
+  const running = statusQuery.data?.running ?? false;
+
+  function handleRun() {
+    if (preset === "custom") {
+      triggerMutation.mutate(customFrom || undefined);
+    } else {
+      triggerMutation.mutate({ mode: preset as "today" | "yesterday" | "7days" });
+    }
+  }
 
   return (
     <>
       <PageHeader
-        title="爬取控制"
-        description="按页面显示时间触发涩花爬虫，并观察后端实时日志"
+        title="手动抓取"
+        description="按指定时间范围触发一次抓取，日期基于来源帖子的发布时间。"
         actions={
-          <Badge tone={statusQuery.data?.running ? "warning" : "success"}>
-            {statusQuery.data?.running ? "运行中" : "空闲"}
-          </Badge>
+          running ? (
+            <Button variant="danger" size="sm" disabled>
+              <Square className="h-3.5 w-3.5" />
+              <span>运行中</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              loading={triggerMutation.isPending}
+              disabled={running}
+              onClick={handleRun}
+            >
+              <Play className="h-3.5 w-3.5" />
+              <span>开始抓取</span>
+            </Button>
+          )
         }
       />
-      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-        <Card>
-          <h2 className="mb-4 text-base font-semibold">手动触发</h2>
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              {datePresets.map((preset) => (
-                <Button
-                  key={preset.mode}
-                  type="button"
-                  variant={preset.mode === crawlMode ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => setCrawlMode(preset.mode)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-            <Button
-              className="w-full"
-              loading={triggerMutation.isPending}
-              disabled={statusQuery.data?.running}
-              onClick={() => triggerMutation.mutate({ mode: crawlMode })}
+
+      {/* Date preset selector */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPreset(p.id)}
+              className={
+                preset === p.id
+                  ? "inline-flex h-7 max-w-full items-center justify-center gap-2 overflow-hidden rounded-md bg-primary px-2.5 text-xs font-medium text-white shadow-[var(--shadow-cta)] transition-all"
+                  : "inline-flex h-7 max-w-full items-center justify-center gap-2 overflow-hidden rounded-md border border-[var(--glass-border)] bg-white/58 px-2.5 text-xs font-medium text-foreground shadow-[var(--shadow-card-soft)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white/72"
+              }
             >
-              <Play className="h-4 w-4" />
-              开始爬取
-            </Button>
-            {triggerMutation.isError ? <ErrorState message={errorMessage(triggerMutation.error)} /> : null}
+              <span className="truncate">{p.label}</span>
+            </button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Field label="开始日期" icon={<Calendar />}>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-40"
+              />
+            </Field>
+            <Field label="结束日期" icon={<Calendar />}>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="w-40"
+              />
+            </Field>
           </div>
-        </Card>
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold">实时日志</h2>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Radio className="h-4 w-4" />
-              SSE
+        )}
+        {triggerMutation.isError ? (
+          <div className="mt-3">
+            <ErrorState message={errorMessage(triggerMutation.error)} />
+          </div>
+        ) : null}
+      </Card>
+
+      {/* Live log */}
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold">实时日志</h2>
+          <Badge tone={running ? "info" : "default"}>
+            {running ? "推送中 · SSE" : "空闲"}
+          </Badge>
+        </div>
+        <div ref={logRef} className="log-pane">
+          {logs.length === 0 ? (
+            <div className="log-empty">- 等待日志 -</div>
+          ) : null}
+          {logs.map((item, index) => (
+            <div key={`${item.time}-${index}`} className="log-line">
+              <span className="log-time">{item.time}</span>
+              <span
+                className={
+                  item.level === "ERROR" || item.level === "CRITICAL"
+                    ? "log-error"
+                    : item.level === "WARNING"
+                      ? "log-warn"
+                      : "log-info"
+                }
+              >
+                {item.level.padEnd(5)}
+              </span>
+              <span className="text-cell">{item.message}</span>
             </div>
-          </div>
-          <div
-            ref={logContainerRef}
-            className="h-[560px] overflow-auto rounded-md bg-slate-950 p-3 font-mono text-xs text-slate-100"
-          >
-            {logs.length === 0 ? <div className="text-slate-400">等待日志...</div> : null}
-            {logs.map((item, index) => (
-              <div key={`${item.time}-${index}`} className="mb-1 grid grid-cols-[150px_72px_1fr] gap-2">
-                <span className="text-slate-400">{item.time}</span>
-                <span
-                  className={
-                    item.level === "ERROR"
-                      ? "text-rose-300"
-                      : item.level === "WARNING"
-                        ? "text-amber-300"
-                        : "text-emerald-300"
-                  }
-                >
-                  {item.level}
-                </span>
-                <span className="break-words">{item.message}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
+          ))}
+          {running && (
+            <div className="log-line">
+              <span className="log-time" />
+              <span className="log-info">INFO </span>
+              <span className="animate-pulse">▌</span>
+            </div>
+          )}
+          {!running && logs.length > 0 && (
+            <div className="log-empty mt-2">- 日志流已暂停 -</div>
+          )}
+        </div>
+      </Card>
     </>
   );
 }

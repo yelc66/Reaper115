@@ -65,7 +65,8 @@ def create_app():
 
         path = request.url.path.rstrip("/") or "/"
         if path.startswith("/api/") and path not in _AUTH_EXEMPT_PATHS:
-            if not _is_authorized(request.headers.get("x-web-auth-key")):
+            key = request.headers.get("x-web-auth-key") or request.query_params.get("key")
+            if not _is_authorized(key):
                 return JSONResponse({"detail": "Web UI authentication required"}, status_code=401)
 
         return await call_next(request)
@@ -105,8 +106,8 @@ def create_app():
 
 
 def _run_web_server(host: str, port: int):
-    install_log_buffer()
     config = uvicorn.Config(create_app(), host=host, port=port, log_level="info")
+    install_log_buffer()  # must be after Config() since it calls configure_logging which resets root handlers
     server = uvicorn.Server(config)
     server.run()
 

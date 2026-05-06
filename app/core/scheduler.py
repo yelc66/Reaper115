@@ -23,6 +23,8 @@ def get_sehua_sync_time():
     return sync_time
 
 def clear_request_count():
+    if init.openapi_115 is None:
+        return
     init.logger.info(f"昨日累计115 OpenAPI请求次数: [{init.openapi_115.request_count}]")
     cache_hit_rate = (init.openapi_115.cache_hit / init.openapi_115.request_count * 100) if init.openapi_115.request_count > 0 else 0
     init.logger.info(f"昨日累计115 缓存命中率: [{cache_hit_rate:.2f}%]")

@@ -21,6 +21,7 @@ class SeleniumBrowser:
     def __init__(self, base_url=None):
         self.base_url = base_url
         self.driver = None
+        self.last_error = None
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     async def init_browser(self):
@@ -28,10 +29,12 @@ class SeleniumBrowser:
 
     def _init_driver(self):
         if not REMOTE_SELENIUM_URL:
-            init.logger.error("未配置 REMOTE_SELENIUM_URL，无法初始化浏览器")
+            self.last_error = "未配置 REMOTE_SELENIUM_URL，无法连接远程 Selenium 浏览器"
+            init.logger.error(self.last_error)
             return
 
         try:
+            self.last_error = None
             init.logger.info(f"正在连接远程 Selenium: {REMOTE_SELENIUM_URL} ...")
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
@@ -51,7 +54,8 @@ class SeleniumBrowser:
 
             init.logger.info("远程 Selenium 连接成功")
         except Exception as e:
-            init.logger.error(f"远程 Selenium 连接失败: {e}")
+            self.last_error = f"远程 Selenium 连接失败: {e}"
+            init.logger.error(self.last_error)
 
     async def close(self):
         try:

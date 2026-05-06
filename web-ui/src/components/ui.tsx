@@ -5,6 +5,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import { Children } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -25,16 +26,17 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex min-w-0 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-md text-sm font-medium transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 [&>span]:min-w-0 [&>span]:truncate",
         variant === "primary" &&
-          "bg-primary text-primary-foreground shadow-[0_12px_28px_rgba(0,122,255,0.28)] hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_16px_36px_rgba(0,122,255,0.34)] active:translate-y-0 active:bg-primary/80",
+          "bg-primary text-white shadow-[var(--shadow-cta)] hover:-translate-y-0.5 hover:bg-[#0070F0] hover:shadow-[var(--shadow-cta-hover)] active:translate-y-0 active:bg-[#0066D9]",
         variant === "secondary" &&
-          "border border-white/70 bg-white/58 text-foreground shadow-panel backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/72",
+          "border border-[var(--glass-border)] bg-white/58 text-foreground shadow-[var(--shadow-card-soft)] backdrop-blur-xl hover:-translate-y-0.5 hover:bg-white/72",
         variant === "ghost" &&
-          "border border-transparent bg-transparent text-muted-foreground hover:bg-white/46 hover:text-foreground",
-        variant === "danger" && "border border-destructive/20 bg-destructive/10 text-red-400 hover:bg-destructive/20",
+          "border border-transparent bg-transparent text-muted-foreground hover:bg-white/55 hover:text-foreground",
+        variant === "danger" &&
+          "border border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/18",
         size === "sm" && "h-7 px-2.5 text-xs",
-        size === "md" && "h-8 px-3.5",
+        size === "md" && "h-8 max-w-full px-3.5",
         size === "icon" && "h-8 w-8 p-0",
         className,
       )}
@@ -42,16 +44,43 @@ export function Button({
       {...props}
     >
       {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-      {children}
+      {Children.map(children, (child) =>
+        typeof child === "string" || typeof child === "number" ? <span>{child}</span> : child,
+      )}
     </button>
   );
 }
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({
+  className,
+  large,
+  children,
+  ...rest
+}: {
+  className?: string;
+  large?: boolean;
+  children: ReactNode;
+  [key: string]: unknown;
+}) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-white/70 bg-white/62 p-4 shadow-panel backdrop-blur-2xl dark:border-white/10 dark:bg-white/10",
+        "rounded-lg border border-[var(--glass-border)] bg-[var(--glass-fill-card)] shadow-panel backdrop-blur-[var(--glass-blur)]",
+        large ? "p-5" : "p-4",
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function CardSoft({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-[var(--glass-border)] bg-white/58 p-4",
         className,
       )}
     >
@@ -70,12 +99,16 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-        {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
+    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="min-w-0">
+        <h1 className="break-words text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+        {description ? (
+          <p className="mt-0.5 break-words text-[13px] text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }
@@ -84,7 +117,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        "h-8 w-full rounded-md border border-white/70 bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
+        "h-8 w-full min-w-0 rounded-md border border-[var(--glass-border)] bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
         className,
       )}
       {...props}
@@ -92,15 +125,21 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   );
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({
+  className,
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       className={cn(
-        "h-8 w-full rounded-md border border-white/70 bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
+        "h-8 w-full min-w-0 rounded-md border border-[var(--glass-border)] bg-white/62 px-3 text-sm text-foreground outline-none backdrop-blur-xl transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+    </select>
   );
 }
 
@@ -108,11 +147,39 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "min-h-28 w-full rounded-md border border-white/70 bg-white/62 px-3 py-2 font-mono text-sm text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/10",
+        "min-h-[90px] w-full min-w-0 rounded-md border border-[var(--glass-border)] bg-white/62 px-3 py-2 font-mono text-[13px] text-foreground outline-none backdrop-blur-xl transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/15",
         className,
       )}
       {...props}
     />
+  );
+}
+
+export function Switch({
+  checked,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+        checked ? "bg-primary" : "bg-muted-foreground/30",
+      )}
+    >
+      <span
+        className={cn(
+          "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+          checked ? "translate-x-[18px]" : "translate-x-[2px]",
+        )}
+      />
+    </button>
   );
 }
 
@@ -121,20 +188,74 @@ export function Badge({
   tone = "default",
 }: {
   children: ReactNode;
-  tone?: "default" | "success" | "warning" | "danger";
+  tone?: "default" | "success" | "warning" | "danger" | "info";
 }) {
   return (
     <span
       className={cn(
-        "inline-flex h-5 items-center rounded px-1.5 text-xs font-medium tracking-wide",
-        tone === "default" && "bg-white/54 text-muted-foreground backdrop-blur-xl",
-        tone === "success" && "bg-emerald-500/12 text-emerald-400",
-        tone === "warning" && "bg-amber-500/12 text-amber-400",
-        tone === "danger" && "bg-rose-500/12 text-rose-400",
+        "inline-flex h-5 max-w-full items-center gap-1 rounded px-1.5 text-xs font-medium tracking-wide",
+        tone === "default" && "border border-white/55 bg-white/55 text-muted-foreground backdrop-blur-xl",
+        tone === "success" && "bg-emerald-500/12 text-emerald-700",
+        tone === "warning" && "bg-amber-500/12 text-amber-700",
+        tone === "danger" && "bg-rose-500/12 text-rose-600",
+        tone === "info" && "bg-primary/10 text-primary",
       )}
     >
       {children}
     </span>
+  );
+}
+
+export function StatCard({
+  label,
+  value,
+  icon,
+  tone = "primary",
+}: {
+  label: string;
+  value: string | number;
+  icon: ReactNode;
+  tone?: "primary" | "success" | "warning" | "danger" | "default";
+}) {
+  return (
+    <Card className="flex items-center justify-between">
+      <div className="min-w-0">
+        <div className="truncate text-[13px] text-muted-foreground">{label}</div>
+        <div className="mt-2 truncate text-3xl font-semibold tracking-tight">{value}</div>
+      </div>
+      <div
+        className={cn(
+          "h-8 w-8 shrink-0",
+          tone === "primary" && "text-primary",
+          tone === "success" && "text-emerald-500",
+          tone === "warning" && "text-amber-500",
+          tone === "danger" && "text-rose-500",
+          tone === "default" && "text-muted-foreground",
+        )}
+      >
+        {icon}
+      </div>
+    </Card>
+  );
+}
+
+export function Field({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground">
+        {icon ? <span className="text-primary [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span> : null}
+        <span className="min-w-0 break-words">{label}</span>
+      </div>
+      {children}
+    </label>
   );
 }
 
@@ -157,7 +278,7 @@ export function LoadingState() {
 
 export function ErrorState({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-rose-500/20 bg-rose-500/8 p-3 text-sm text-rose-400">
+    <div className="rounded-md border border-rose-500/20 bg-rose-500/8 p-3 text-sm text-rose-600">
       {message}
     </div>
   );

@@ -40,6 +40,9 @@ async def start_d_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not init.check_user(usr_id):
         await update.message.reply_text("⚠️ 对不起，您无权使用115机器人！")
         return ConversationHandler.END
+    if init.openapi_115 is None:
+        await update.message.reply_text("⚠️ 115 未授权，请先使用 /auth 完成扫码授权。")
+        return ConversationHandler.END
     magnet_link = update.message.text.strip()
     context.user_data["link"] = magnet_link  # 将用户参数存储起来
     init.logger.info(f"download link: {magnet_link}")

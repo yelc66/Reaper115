@@ -45,6 +45,9 @@ def wait_for_message_queue_completion(task_name="任务", timeout=0):
 
 def offline_task_retry():
     """调度器入口：先做后处理，再提交新的离线任务"""
+    if init.openapi_115 is None:
+        init.logger.warn("115 未授权，跳过离线任务重试")
+        return
     init.logger.info("开始涩花离线任务...")
     sehua_post_process()
     sehua_offline()

@@ -35,6 +35,9 @@ def clear_failed_tasks():
 
 
 def try_to_offline2115_again():
+    if init.openapi_115 is None:
+        init.logger.warn("115 未授权，跳过离线重试任务")
+        return
     failed_tasks = get_failed_tasks()
     if not failed_tasks:
         init.logger.info("重试列表为空，暂时没有需要重试的任务！")

@@ -45,11 +45,11 @@ def trigger_crawl(payload: CrawlTriggerRequest):
     )
     crawl_mode = payload.mode
     if not crawl_mode:
-        start_date, end_date = parse_crawl_date_range(payload.start_date or payload.date, payload.end_date)
-        if start_date == end_date:
-            crawl_mode = "today" if start_date == parse_crawl_date_range(None)[0] else "yesterday"
+        if payload.start_date or payload.date or payload.end_date:
+            start_date, end_date = parse_crawl_date_range(payload.start_date or payload.date, payload.end_date)
+            crawl_mode = "7days" if start_date != end_date else start_date
         else:
-            crawl_mode = "7days"
+            crawl_mode = "yesterday"
     if init.CRAWL_SEHUA_STATUS == 1:
         raise HTTPException(status_code=409, detail="Crawl task is already running")
 

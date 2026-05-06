@@ -49,6 +49,8 @@ export type StrategyRule = {
   name: string;
   pattern: string;
   savePath?: string | null;
+  kind: "include" | "exclude";
+  active: boolean;
 };
 
 export type StrategyRuleInput = Omit<StrategyRule, "id">;
@@ -70,7 +72,6 @@ export type CrawlStatus = {
 
 export type SystemStatus = {
   openapiReady: boolean;
-  tokenFileExists: boolean;
   crawlRunning: boolean;
   debugMode: boolean;
   paths: Record<string, string>;

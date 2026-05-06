@@ -68,6 +68,8 @@ export function mapStrategyRule(rule: StrategyRuleDto): StrategyRule {
     name: rule.name,
     pattern: rule.pattern,
     savePath: rule.save_path,
+    kind: rule.kind === "exclude" ? "exclude" : "include",
+    active: rule.active !== false,
   };
 }
 
@@ -78,6 +80,8 @@ export function toStrategyRuleInputDto(rule: StrategyRuleInput): StrategyRuleInp
     name: rule.name,
     pattern: rule.pattern,
     save_path: rule.savePath,
+    kind: rule.kind,
+    active: rule.active,
   };
 }
 
@@ -97,7 +101,6 @@ export function mapOfflineTask(task: OfflineTaskDto): OfflineTask {
 export function mapSystemStatus(status: SystemStatusDto): SystemStatus {
   return {
     openapiReady: status.openapi_ready,
-    tokenFileExists: status.token_file_exists,
     crawlRunning: status.crawl_running,
     debugMode: status.debug_mode,
     paths: status.paths,

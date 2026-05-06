@@ -35,9 +35,7 @@ def add_task_to_queue(sub_user, post_url, message, keyboard=None, retry_count=0)
         
         
 async def queue_worker(loop, token):
-    global global_loop
     """ 后台队列处理任务 """
-    global_loop = loop
     # bot
     bot = Bot(token=token)
     init.logger.info("消息队列线程启动成功！")
