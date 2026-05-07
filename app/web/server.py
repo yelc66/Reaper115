@@ -110,7 +110,16 @@ def create_app():
     # Serve the built React SPA when the dist directory is present (production).
     # API routes above take precedence because they are registered first.
     if os.path.isdir(_DIST_DIR):
-        app.mount("/assets", StaticFiles(directory=os.path.join(_DIST_DIR, "assets")), name="assets")
+        # Mount every subdirectory in dist as a static route so files like
+        # /brand/... and /icons/... are served directly instead of being
+        # caught by the SPA fallback below.
+        for entry in os.scandir(_DIST_DIR):
+            if entry.is_dir():
+                app.mount(f"/{entry.name}", StaticFiles(directory=entry.path), name=entry.name)
+
+        @app.get("/favicon.png", include_in_schema=False)
+        def serve_favicon():
+            return FileResponse(os.path.join(_DIST_DIR, "favicon.png"))
 
         @app.get("/{full_path:path}", include_in_schema=False)
         def serve_spa(full_path: str):  # noqa: ARG001

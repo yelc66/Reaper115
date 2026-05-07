@@ -59,8 +59,7 @@ def get_help_info():
 • 输入 <code>"/rl"</code>
 • 查看当前重试列表，可根据需要选择是否清空\n
 <u>手动爬取涩花：</u>
-• 常用：<code>/csh_yesterday</code>、<code>/csh_today</code>、<code>/csh_7days</code>
-• 如需指定日期，仍可手动输入 <code>/csh 20260430</code>\n
+• 常用：<code>/csh_yesterday</code>、<code>/csh_today</code>、<code>/csh_7days</code>\n
 <u>视频转存：</u>
 • 直接转发视频给机器人，选择保存目录即可保存到115
 """

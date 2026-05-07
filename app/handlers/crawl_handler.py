@@ -1,7 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 import init
-import datetime
 import threading
 
 
@@ -44,16 +43,12 @@ async def crawl_sehua(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif arg.lower() in _MODE_ALIASES:
         crawl_mode = _MODE_ALIASES[arg.lower()]
     else:
-        try:
-            date_obj = datetime.datetime.strptime(arg, "%Y%m%d")
-            crawl_mode = date_obj.strftime("%Y-%m-%d")
-        except ValueError:
-            await update.message.reply_text(
-                "⚠️ 参数错误，支持：today / yesterday / 7days / yyyymmdd\n"
-                "例：/csh、/csh today、/csh 7days、/csh 20260430\n\n"
-                "也可以直接使用：/csh_yesterday /csh_today /csh_7days"
-            )
-            return
+        await update.message.reply_text(
+            "⚠️ 参数错误，支持：today / yesterday / 7days\n"
+            "例：/csh、/csh today、/csh 7days\n\n"
+            "也可以直接使用：/csh_yesterday /csh_today /csh_7days"
+        )
+        return
 
     await _start_sehua_crawl(update, crawl_mode)
 
