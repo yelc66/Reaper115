@@ -61,6 +61,9 @@ export const sehuaApi = {
     ),
   download: async (id: number) => (await api.post(`/api/sehua/${id}/download`)).data,
   batchDownload: async (ids: number[]) => (await api.post("/api/sehua/batch-download", { ids })).data,
+  postProcess: async (id: number) => (await api.post(`/api/sehua/${id}/post-process`)).data,
+  batchPostProcess: async () => (await api.post("/api/sehua/batch-post-process")).data,
+  processStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/sehua/process-status")).data,
   delete: async (id: number) => (await api.delete(`/api/sehua/${id}`)).data,
   batchDelete: async (ids: number[]) => (await api.delete("/api/sehua/batch-delete", { data: { ids } })).data,
 };

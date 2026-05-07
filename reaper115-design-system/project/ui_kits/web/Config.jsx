@@ -37,7 +37,7 @@ function Config() {
   const [form, setForm] = React.useState({
     logLevel: "info",
     webEnabled: true,
-    webPort: "8000",
+    webPort: "8115",
     webAuthKey: "",
     cleanEnabled: true,
     cleanLessThan: "400M",

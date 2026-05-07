@@ -4,6 +4,7 @@ import re
 import time
 import os
 import asyncio
+import threading
 from datetime import datetime, timedelta
 from app.utils.sqlitelib import *
 from app.utils.message_queue import add_task_to_queue
@@ -11,6 +12,9 @@ from telegram.helpers import escape_markdown
 
 # 超过此天数仍未完成视为死种，跳过不再处理
 DEAD_SEED_DAYS = 3
+
+# 轮询间隔（秒）：每隔多久检查一次115下载状态
+POLL_INTERVAL_SECONDS = 5 * 60
 
 
 def wait_for_message_queue_completion(task_name="任务", timeout=0):
@@ -43,6 +47,39 @@ def wait_for_message_queue_completion(task_name="任务", timeout=0):
         init.logger.info(f"所有{task_name}通知已发送完成（降级方案），开始清理流程")
 
 
+def _post_process_watcher():
+    """
+    后台轮询线程：每隔 POLL_INTERVAL_SECONDS 检查一次 is_download=1 的任务。
+    有任务完成则立即执行后处理；全部处理完毕后退出线程。
+    """
+    init.logger.info(f"[涩花轮询] 后台轮询线程启动，间隔 {POLL_INTERVAL_SECONDS // 60} 分钟")
+    try:
+        while True:
+            time.sleep(POLL_INTERVAL_SECONDS)
+            with SqlLiteLib() as sqlite:
+                pending = sqlite.query_all("SELECT id FROM sehua_data WHERE is_download=1")
+            if not pending:
+                init.logger.info("[涩花轮询] 所有任务已处理完毕，轮询线程退出")
+                break
+            init.logger.info(f"[涩花轮询] 检测到 {len(pending)} 个待后处理任务，触发后处理")
+            try:
+                sehua_post_process()
+            except Exception as e:
+                init.logger.error(f"[涩花轮询] 后处理执行出错: {e}")
+    finally:
+        init.POLL_WATCHER_RUNNING = False
+
+
+def start_post_process_watcher():
+    """若轮询线程未在运行，则启动一个守护线程进行后台轮询。"""
+    if init.POLL_WATCHER_RUNNING:
+        init.logger.info("[涩花轮询] 轮询线程已在运行，跳过重复启动")
+        return
+    init.POLL_WATCHER_RUNNING = True
+    t = threading.Thread(target=_post_process_watcher, name="sehua-poll-watcher", daemon=True)
+    t.start()
+
+
 def offline_task_retry():
     """调度器入口：先做后处理，再提交新的离线任务"""
     if init.openapi_115 is None:
@@ -59,6 +96,9 @@ def offline_task_retry():
 
 def sehua_offline(date=None):
     """查找 is_download=0 的条目，批量提交到 115，提交成功立即标记为已离线"""
+    if init.openapi_115 is None:
+        init.logger.error("115 未授权，跳过涩花离线任务")
+        return
     submitted_results = []
     sections = init.bot_config.get('sehuatang_spider', {}).get('sections', [])
     sort_by_ym = init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False)
@@ -76,7 +116,7 @@ def sehua_offline(date=None):
         offline_groups = create_offline_group_by_save_path(results)
         if not offline_groups:
             init.logger.warn("涩花离线任务未执行，可能是115离线配额不足，请检查115账号状态！")
-            add_task_to_queue(init.bot_config['allowed_user'], f"{init.IMAGE_PATH}/male023.png",
+            add_task_to_queue(init.get_allowed_user(), f"{init.IMAGE_PATH}/male023.png",
                               "涩花离线任务未执行，可能是115离线配额不足，请检查115账号状态！")
             return
 
@@ -105,10 +145,11 @@ def sehua_offline(date=None):
         date_text = f"，日期: {date}" if date else ""
         message = escape_markdown(f"✅ 涩花爬取完成{date_text}，没有找到更新内容或待离线任务。", version=2)
         init.logger.info(f"涩花离线任务完成{date_text}，没有找到更新内容或待离线任务。")
-        add_task_to_queue(init.bot_config['allowed_user'], None, message)
+        add_task_to_queue(init.get_allowed_user(), None, message)
         return
 
     _notify_submitted(submitted_results, date)
+    start_post_process_watcher()
 
 
 def _notify_submitted(submitted_results, date=None):
@@ -126,7 +167,7 @@ def _notify_submitted(submitted_results, date=None):
 
     date_text = escape_markdown(f"，日期: {date}" if date else "", version=2)
     final_message = f"**涩花离线任务已提交{date_text}:**\n" + "\n".join(lines)
-    add_task_to_queue(init.bot_config['allowed_user'], f"{init.IMAGE_PATH}/sehua_daily_update.png", final_message)
+    add_task_to_queue(init.get_allowed_user(), f"{init.IMAGE_PATH}/sehua_daily_update.png", final_message)
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +192,14 @@ def sehua_post_process():
     init.logger.info(f"[涩花后处理] 找到 {len(pending_items)} 个待检查任务")
 
     offline_task_status = init.openapi_115.get_offline_tasks()
-    task_map = {task['url']: task for task in offline_task_status}
+    if not offline_task_status:
+        init.logger.warn("[涩花后处理] 获取115离线任务列表失败，跳过本次后处理")
+        return
+
+    # 用 info_hash (大写) 做匹配键，避免 magnet URL 格式差异
+    from app.utils.utils import get_magnet_hash
+    task_map = {task['info_hash'].upper(): task for task in offline_task_status}
+    init.logger.debug(f"[涩花后处理] 115任务列表: {list(task_map.keys())}")
 
     sort_by_ym = init.bot_config.get('sehuatang_spider', {}).get('sort_by_year_month', False)
     now = datetime.now()
@@ -169,7 +217,9 @@ def sehua_post_process():
         save_path = add_year_month_to_path(sort_by_ym, item['save_path'])
         submitted_at = item.get('submitted_at')
 
-        task = task_map.get(magnet)
+        item_hash = (get_magnet_hash(magnet) or '').upper()
+        task = task_map.get(item_hash)
+        init.logger.debug(f"[涩花后处理] {title} hash={item_hash} matched={task is not None}")
 
         # 115 任务已完成
         if task and task.get('status') == 2 and task.get('percentDone') == 100:
@@ -230,7 +280,7 @@ def sehua_post_process():
             f"涩花后处理完成: {completed_count} 个下载完成，{dead_count} 个死种放弃，{skipped_count} 个仍在下载",
             version=2
         )
-        add_task_to_queue(init.bot_config['allowed_user'], None, msg)
+        add_task_to_queue(init.get_allowed_user(), None, msg)
 
 
 # ---------------------------------------------------------------------------

@@ -13,16 +13,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 def _remote_selenium_url():
-    """优先 config.yaml sehuatang_spider.remote_selenium_url（仅填 host），再读环境变量。"""
-    val = (init.bot_config.get("sehuatang_spider") or {}).get("remote_selenium_url") or ""
+    """优先 config.yaml remote_selenium_url（仅填 host），再读环境变量。"""
+    val = init.bot_config.get("remote_selenium_url") or ""
     host = (val or os.getenv("REMOTE_SELENIUM_URL") or "").rstrip("/")
     if not host:
         return None
     return host if host.endswith("/wd/hub") else f"{host}/wd/hub"
 
 def _flaresolverr_url():
-    """优先 config.yaml sehuatang_spider.flaresolverr_url（仅填 host），再读环境变量。"""
-    val = (init.bot_config.get("sehuatang_spider") or {}).get("flaresolverr_url") or ""
+    """优先 config.yaml flaresolverr_url（仅填 host），再读环境变量。"""
+    val = init.bot_config.get("flaresolverr_url") or ""
     host = (val or os.getenv("FLARESOLVERR_URL") or "").rstrip("/")
     if not host:
         host = "http://flaresolverr:8191"

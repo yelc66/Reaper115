@@ -103,7 +103,7 @@ class OpenAPI_115:
                 init.logger.info("使用配置文件中的access_token和refresh_token")
             elif app_id and str(app_id).lower() not in ('', 'your_115_app_id'):
                 init.logger.info("正在进入PKCE授权流程，获取refresh_token...")
-                self.auth_pkce(init.bot_config['allowed_user'], app_id)
+                self.auth_pkce(init.get_allowed_user(), app_id)
         
         
     def auth_pkce(self, sub_user, app_id):
@@ -282,7 +282,7 @@ class OpenAPI_115:
             if not self.refresh_token:
                 if not file_refresh_token:
                     init.logger.warn("请先进行授权，获取refresh_token！")
-                    add_task_to_queue(init.bot_config['allowed_user'], "/app/images/male023.png", "请先进行授权，获取refresh_token！")
+                    add_task_to_queue(init.get_allowed_user(), "/app/images/male023.png", "请先进行授权，获取refresh_token！")
                     return
                 self.access_token = file_access_token
                 self.refresh_token = file_refresh_token
@@ -1293,26 +1293,23 @@ class OpenAPI_115:
             if fid_list:
                 self._batch_delete_files(fid_list)
 
+    def _is_ad_filename(self, filename: str, ad_patterns: list) -> bool:
+        """文件名是否命中广告关键词（大小写不敏感）。"""
+        fn_lower = filename.lower()
+        return any(p.lower() in fn_lower for p in ad_patterns if p)
+
     def find_all_junk_files(self, cid, offset, byte_size, file_list=None, limit=1150):
         """
-        递归查找所有小于指定大小的垃圾文件
-        
-        使用分页查询和文件大小排序优化，当最后一个文件仍小于目标大小时继续递归查找，
-        否则停止查询并过滤返回小于目标大小的文件。
-        
-        Args:
-            cid: 目录ID
-            offset: 偏移量，用于分页
-            byte_size: 目标文件大小（字节），小于此大小的文件被视为垃圾文件
-            file_list: 已找到的文件列表，用于递归累积
-            limit: 每页查询的文件数量，默认1150
-            
-        Returns:
-            list: 所有小于目标大小的文件列表，包含文件的fid、fn、fs等信息
+        递归查找垃圾文件。判定规则（同时支持）：
+          1. 文件名命中 clean_policy.ad_name_patterns 中的广告关键词
+          2. 文件大小 < byte_size（仅当 byte_size > 0 时生效）
+
+        clean_policy.protect_largest=true（默认）时，目录内体积最大的文件永远受保护，
+        即使文件名命中广告模式也不会被删除，防止误删主视频。
         """
         if file_list is None:
             file_list = []
-            
+
         params = {
             "cid": cid,
             "limit": limit,
@@ -1322,40 +1319,81 @@ class OpenAPI_115:
             "o": "file_size",
             "offset": offset
         }
-        
-        # 获取当前页的文件列表
-        current_files = self.get_file_list(params)
-        
-        # 如果API调用失败或没有获取到文件，说明已经到末尾或出现错误
-        if not current_files:
-            # 过滤掉大于等于目标大小的文件，只返回垃圾文件
-            junk_files = [f for f in file_list if f['fs'] < byte_size]
-            return junk_files
-            
-        # 将当前页的文件添加到结果列表
-        file_list.extend(current_files)
-        
-        # 检查是否还有下一页
-        if len(current_files) < limit:
-             # 当前页不满limit，说明已经是最后一页了
-            junk_files = [f for f in file_list if int(f.get('fs', 0)) < byte_size]
-            return junk_files
 
-        # 检查最后一个文件的大小
+        current_files = self.get_file_list(params)
+
+        if not current_files:
+            return self._filter_junk(file_list, byte_size)
+
+        file_list.extend(current_files)
+
+        if len(current_files) < limit:
+            return self._filter_junk(file_list, byte_size)
+
         try:
-             last_file_size = int(current_files[-1].get('fs', 0))
+            last_file_size = int(current_files[-1].get('fs', 0))
         except (ValueError, TypeError, IndexError):
-             last_file_size = 0
-        
-        # 如果最后一个文件大小仍然小于目标大小，且还有更多文件（上面已经判断了是否满页），继续递归查找
+            last_file_size = 0
+
         if last_file_size < byte_size:
             offset += limit
-            time.sleep(1)  # 降低延时
+            time.sleep(1)
             return self.find_all_junk_files(cid, offset, byte_size, file_list)
         else:
-            # 已经找到所有小于目标大小的文件，过滤掉大于等于目标大小的文件
-            junk_files = [f for f in file_list if int(f.get('fs', 0)) < byte_size]
-            return junk_files
+            return self._filter_junk(file_list, byte_size)
+
+    def _filter_junk(self, file_list: list, byte_size: int) -> list:
+        """
+        从 file_list 中筛选出垃圾文件：
+          - 文件扩展名命中 ad_extensions → 删（不受 protect_largest 保护）
+          - 文件名命中广告模式 → 删
+          - 文件大小 < byte_size（且 byte_size > 0）→ 删
+        但目录中体积最大的文件受 protect_largest 保护，永不删（扩展名命中除外）。
+        """
+        if not file_list:
+            return []
+
+        clean_cfg = init.bot_config.get('clean_policy', {})
+        ad_patterns = clean_cfg.get('ad_name_patterns') or []
+        ad_extensions = [e.lower() for e in (clean_cfg.get('ad_extensions') or [])]
+        protect_largest = str(clean_cfg.get('protect_largest', 'true')).lower() != 'false'
+
+        # 找出体积最大的文件 fid（受保护）
+        protected_fid = None
+        if protect_largest and file_list:
+            largest = max(file_list, key=lambda f: int(f.get('fs', 0)))
+            protected_fid = largest.get('fid')
+
+        junk = []
+        for f in file_list:
+            fid = f.get('fid')
+            fn = f.get('fn', '')
+            fs = int(f.get('fs', 0))
+            ext = '.' + fn.rsplit('.', 1)[-1].lower() if '.' in fn else ''
+
+            # 扩展名命中：无条件删，不受 protect_largest 保护
+            if ad_extensions and ext in ad_extensions:
+                init.logger.debug(f"[广告清理] 命中(广告扩展名): {fn}")
+                junk.append(f)
+                continue
+
+            if fid == protected_fid:
+                init.logger.debug(f"[广告清理] 保护最大文件，跳过: {fn} ({fs} bytes)")
+                continue
+
+            is_ad_name = bool(ad_patterns) and self._is_ad_filename(fn, ad_patterns)
+            is_small = byte_size > 0 and fs < byte_size
+
+            if is_ad_name or is_small:
+                reason = []
+                if is_ad_name:
+                    reason.append("广告文件名")
+                if is_small:
+                    reason.append(f"小于 {byte_size} bytes")
+                init.logger.debug(f"[广告清理] 命中({'/'.join(reason)}): {fn}")
+                junk.append(f)
+
+        return junk
         
     def find_all_empty_dirs(self, pid_list):
         """

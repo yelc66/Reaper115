@@ -30,10 +30,10 @@ mkdir -p config tmp && cp app/config.yaml.example config/config.yaml
 TG115_DEBUG=1 python app/115bot.py
 ```
 
-Web UI dev (runs against the FastAPI backend at `http://127.0.0.1:8000`):
+Web UI dev (runs against the FastAPI backend at `http://127.0.0.1:8115`):
 
 ```bash
-cd web-ui && cp .env.example .env   # VITE_API_BASE_URL=http://127.0.0.1:8000
+cd web-ui && cp .env.example .env   # VITE_API_BASE_URL=http://127.0.0.1:8115
 npm install && npm run dev          # http://localhost:5173
 ```
 

@@ -407,7 +407,7 @@ async def sehuatang_spider_start_async():
         if not browser.driver:
             reason = getattr(browser, "last_error", None) or "请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务状态"
             message = escape_markdown(f"❌ 浏览器初始化失败！{reason}", version=2)
-            add_task_to_queue(init.bot_config['allowed_user'], None, message)
+            add_task_to_queue(init.get_allowed_user(), None, message)
             return
 
         await apply_configured_cookies()
@@ -462,7 +462,7 @@ async def sehuatang_spider_by_date_async(date, end_date=None):
         if not browser.driver:
             reason = getattr(browser, "last_error", None) or "请检查 REMOTE_SELENIUM_URL 和远程 Selenium 服务状态"
             message = escape_markdown(f"❌ 浏览器初始化失败！{reason}", version=2)
-            add_task_to_queue(init.bot_config['allowed_user'], None, message)
+            add_task_to_queue(init.get_allowed_user(), None, message)
             return
 
         await apply_configured_cookies()

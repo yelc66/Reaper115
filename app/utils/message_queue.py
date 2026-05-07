@@ -15,7 +15,7 @@ def add_task_to_queue(sub_user, post_url, message, keyboard=None, retry_count=0)
     """向消息队列中添加任务（线程安全）"""
     global global_loop
     if global_loop is None:
-        init.logger.error("事件循环尚未启动，无法添加任务到队列")
+        init.logger.debug("Telegram 未启用，跳过消息通知")
         return False
     
     try:

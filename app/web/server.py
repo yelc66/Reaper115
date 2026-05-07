@@ -138,7 +138,7 @@ def start_web_server_in_thread():
         return None
 
     host = web_config.get("host", "0.0.0.0")
-    port = int(web_config.get("port", 8000))
+    port = int(web_config.get("port", 8115))
     thread = threading.Thread(target=_run_web_server, args=(host, port), daemon=True)
     thread.start()
     init.logger.info(f"Web API started on http://{host}:{port}")

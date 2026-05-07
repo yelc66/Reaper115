@@ -66,6 +66,8 @@ tg_user_client = None
 
 # 爬取状态
 CRAWL_SEHUA_STATUS = 0  # 涩花爬取状态
+POST_PROCESS_STATUS = 0  # 涩花后处理状态：0=空闲, 1=运行中
+POLL_WATCHER_RUNNING = False  # 后台轮询后处理线程是否在运行
 
 
 # yaml配置文件
@@ -253,6 +255,11 @@ def initialize_115open():
         logger.error(f"115 OpenAPI客户端初始化失败: {e}")
         openapi_115 = None
         return False
+
+
+def get_allowed_user():
+    """返回配置的 allowed_user，未配置时返回 None。"""
+    return bot_config.get('allowed_user')
 
 
 def check_user(user_id):

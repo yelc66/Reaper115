@@ -19,10 +19,6 @@ sehuatang_spider:
   sync_time: "03:00"
   base_url: www.sehuatang.net
   cookie_string: ""
-  # 远程 Selenium host（留空则不使用，/wd/hub 由代码自动拼接）
-  remote_selenium_url: ""
-  # FlareSolverr host（留空则不使用，/v1 由代码自动拼接）
-  flaresolverr_url: ""
   sections:
     - name: 高清中文字幕
       save_path: /AV/涩花/高清中文字幕
@@ -39,19 +35,39 @@ sehuatang_spider:
   sort_by_year_month: false
   rename_by_title: true
 
-############################################AI##################################
-ai:
-  api_url: https://api.siliconflow.cn/v1
-  api_key: ""
-  model: deepseek-ai/DeepSeek-V3.2
+############################################远程浏览器##################################
+# 远程 Selenium host（留空则不使用，/wd/hub 由代码自动拼接）
+remote_selenium_url: "http://chrome:4444"
+# FlareSolverr host（留空则不使用，/v1 由代码自动拼接）
+flaresolverr_url: ""
 
 ############################################Web 管理界面##################################
 web:
   enable: true
-  port: 8000
+  port: 8115
   auth_key: ""
 
 ############################################广告清理##################################
 clean_policy:
   switch: "on"
-  less_than: 400M
+  less_than: 100M
+  # 文件名包含以下任一关键词则视为广告文件，直接删除（不受 less_than 大小限制）
+  # 留空列表则仅用大小过滤
+  ad_name_patterns:
+    - "489155.com"
+    - "sexinsex"
+    - "草榴社区"
+    - "t66y.com"
+    - "getfreeav"
+    - "bbs."
+    - "www."
+    - "直播"
+    - "位址"
+    - "社区最新情报"
+  # 扩展名匹配则视为广告文件，直接删除（不受 less_than 大小限制，不受 protect_largest 保护）
+  ad_extensions:
+    - ".html"
+    - ".txt"
+    - ".url"
+  # 保护最大文件：目录中体积最大的文件永远不删（即使文件名命中广告模式）
+  protect_largest: true

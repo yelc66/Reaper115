@@ -17,6 +17,8 @@ import {
 } from "../components/ui";
 import { cn, errorMessage } from "../lib/utils";
 
+const DEFAULT_REMOTE_SELENIUM_URL = "http://chrome:4444";
+
 type FormState = {
   logLevel: string;
   webEnabled: boolean;
@@ -29,9 +31,6 @@ type FormState = {
   appId: string;
   accessToken: string;
   refreshToken: string;
-  aiApiUrl: string;
-  aiApiKey: string;
-  aiModel: string;
   remoteSeleniumUrl: string;
   flareSolverrUrl: string;
 };
@@ -39,25 +38,20 @@ type FormState = {
 function toFormState(config: Record<string, unknown>): FormState {
   const clean = (config.clean_policy ?? {}) as Record<string, unknown>;
   const web = (config.web ?? {}) as Record<string, unknown>;
-  const ai = (config.ai ?? {}) as Record<string, unknown>;
-  const spider = (config.sehuatang_spider ?? {}) as Record<string, unknown>;
   return {
     logLevel: (config.log_level as string) || "info",
     webEnabled: web.enable !== false,
-    webPort: String(web.port ?? 8000),
+    webPort: String(web.port ?? 8115),
     webAuthKey: (web.auth_key as string) || "",
     botToken: (config.bot_token as string) || "",
     allowedUser: String(config.allowed_user ?? ""),
     appId: (config["115_app_id"] as string) || "",
     accessToken: (config.access_token as string) || "",
     refreshToken: (config.refresh_token as string) || "",
-    aiApiUrl: (ai.api_url as string) || "",
-    aiApiKey: (ai.api_key as string) || "",
-    aiModel: (ai.model as string) || "",
     cleanEnabled: (clean.switch as string) !== "off",
     cleanLessThan: (clean.less_than as string) || "400M",
-    remoteSeleniumUrl: (spider.remote_selenium_url as string) || "",
-    flareSolverrUrl: (spider.flaresolverr_url as string) || "",
+    remoteSeleniumUrl: (config.remote_selenium_url as string) || DEFAULT_REMOTE_SELENIUM_URL,
+    flareSolverrUrl: (config.flaresolverr_url as string) || "",
   };
 }
 
@@ -71,13 +65,9 @@ function toApiConfig(form: FormState, original: Record<string, unknown>): Record
     "115_app_id": form.appId,
     access_token: form.accessToken,
     refresh_token: form.refreshToken,
-    ai: { ...((original.ai as object) || {}), api_url: form.aiApiUrl, api_key: form.aiApiKey, model: form.aiModel },
     clean_policy: { ...((original.clean_policy as object) || {}), switch: form.cleanEnabled ? "on" : "off", less_than: form.cleanLessThan },
-    sehuatang_spider: {
-      ...((original.sehuatang_spider as object) || {}),
-      remote_selenium_url: form.remoteSeleniumUrl,
-      flaresolverr_url: form.flareSolverrUrl,
-    },
+    remote_selenium_url: form.remoteSeleniumUrl,
+    flaresolverr_url: form.flareSolverrUrl,
   };
 }
 
@@ -114,7 +104,6 @@ export function Config() {
   const tgSave = useSectionSave("保存并测试", systemApi.testTelegram);
   const api115Save = useSectionSave("保存并测试", systemApi.test115);
   const browserSave = useSectionSave("保存");
-  const aiSave = useSectionSave("保存");
 
   useEffect(() => {
     if (configQuery.data?.config) {
@@ -275,36 +264,6 @@ export function Config() {
         </Row>
       </Section>
 
-      {/* ── AI Model ── */}
-      <Section
-        title="AI 模型"
-        hint="用于媒体名称识别和其他 AI 能力。"
-        saveState={aiSave}
-        onSave={() => saveSection(aiSave)}
-      >
-        <Row label="API 地址">
-          <Input
-            value={formState.aiApiUrl}
-            onChange={(e) => patch("aiApiUrl", e.target.value)}
-            placeholder="https://api.siliconflow.cn/v1"
-          />
-        </Row>
-        <Row label="API Key">
-          <Input
-            type="password"
-            value={formState.aiApiKey}
-            onChange={(e) => patch("aiApiKey", e.target.value)}
-            placeholder="sk-xxxxxxxxxxxxxxxxxxx"
-          />
-        </Row>
-        <Row label="模型">
-          <Input
-            value={formState.aiModel}
-            onChange={(e) => patch("aiModel", e.target.value)}
-            placeholder="deepseek-ai/DeepSeek-V3.2"
-          />
-        </Row>
-      </Section>
     </>
   );
 }

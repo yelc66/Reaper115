@@ -90,7 +90,7 @@ def try_to_offline2115_again():
 **保存路径:** `{save_path}`
         """
                     try:
-                        add_task_to_queue(init.bot_config['allowed_user'], None, message=message)
+                        add_task_to_queue(init.get_allowed_user(), None, message=message)
                     except TelegramError as e:
                         init.logger.warn(f"Telegram API error: {e}")
                     except Exception as e:
