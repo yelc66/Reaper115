@@ -3,10 +3,10 @@ services:
     container_name: reaper115
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      # 已有 FlareSolverr 服务的话取消注释并填写地址
+      # FlareSolverr 服务
       FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://flaresolverr:8191}
       
-      # 浏览器初始化失败时尝试打开此选项，与下面的 chrome 服务配合使用
+      # chrome 服务配合使用
       REMOTE_SELENIUM_URL: ${REMOTE_SELENIUM_URL:-http://chrome:4444}
       
       # 填写代理如果需要的话(两个都要填)

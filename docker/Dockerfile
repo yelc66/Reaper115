@@ -4,7 +4,7 @@ WORKDIR /build
 COPY web-ui/package.json web-ui/package-lock.json ./
 RUN npm ci --prefer-offline
 COPY web-ui/ ./
-RUN npm run build
+RUN VITE_API_BASE_URL= npm run build
 
 # Stage 2: Python runtime
 FROM python:3.12-slim

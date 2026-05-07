@@ -33,8 +33,19 @@ ENV/
 *.swp
 *.swo
 
+# AI/IDE tool internal files
+CLAUDE.md
+.codex
+**/.codex
+
 # Local planning & idea docs
 Sehua-Web项目规划.md
+reaper115-design-system/
+
+# TypeScript/Vite build artifacts
+web-ui/tsconfig*.tsbuildinfo
+web-ui/vite.config.js
+web-ui/vite.config.d.ts
 
 # Project specific
 .env

@@ -38,7 +38,7 @@ jobs:
       
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -203,43 +203,22 @@ jobs:
           
           echo "labels=${LABELS}" >> $GITHUB_OUTPUT
 
-      - name: Debug build info
-        run: |
-          echo "🔍 Build Debug Information:"
-          echo "Event name: ${{ github.event_name }}"
-          echo "Should push: ${{ github.event_name != 'pull_request' }}"
-          echo "FORCE PUSH: true (debugging)"
-          echo "Tags: ${{ steps.tags.outputs.tags }}"
-          echo "Platforms: linux/amd64,linux/arm64"
-          echo "Registry: ${{ env.REGISTRY }}"
-          echo "Image name: ${{ env.IMAGE_NAME }}"
-          
-      - name: Verify Docker login
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "🔐 Testing Docker Hub authentication..."
-          docker info || echo "⚠️ Docker info failed"
-          echo "✅ Docker login appears successful"
-          
       - name: Build and push Docker images
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           platforms: linux/amd64,linux/arm64
-          # 🚨 强制推送，确保一定推送到 Docker Hub
-          push: true  # 强制推送，不管触发条件
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.tags }}
           labels: ${{ steps.labels.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 添加构建参数以强制区分不同构建
           build-args: |
             BUILDTIME=${{ steps.version.outputs.timestamp }}
-          # 添加详细输出
-          outputs: type=registry,push=true
           
       - name: Verify Docker Hub push success
+        if: github.event_name != 'pull_request'
         run: |
           echo "🔍 Verifying images were pushed to Docker Hub..."
           echo "📋 Expected tags: ${{ steps.tags.outputs.tags }}"

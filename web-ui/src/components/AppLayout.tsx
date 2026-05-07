@@ -12,12 +12,12 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { to: "/",        label: "仪表盘",     icon: Gauge    },
-  { to: "/strategy", label: "抓取策略",   icon: Sliders  },
-  { to: "/sehua",   label: "涩花数据",   icon: Database  },
-  { to: "/tasks",   label: "重试任务",   icon: ListTodo  },
-  { to: "/crawl",   label: "手动抓取",   icon: Activity  },
-  { to: "/config",  label: "系统配置",   icon: Server    },
+  { to: "/", label: "仪表盘", icon: Gauge },
+  { to: "/config", label: "系统配置", icon: Server },
+  { to: "/strategy", label: "抓取策略", icon: Sliders },
+  { to: "/sehua", label: "涩花数据", icon: Database },
+  { to: "/tasks", label: "重试任务", icon: ListTodo },
+  { to: "/crawl", label: "手动抓取", icon: Activity },
 ];
 
 export function AppLayout({
@@ -30,9 +30,7 @@ export function AppLayout({
   return (
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
-      <aside
-        className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-[var(--glass-border)] bg-[var(--glass-fill-sidebar)] shadow-glass backdrop-blur-[var(--glass-blur)]"
-      >
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-[var(--glass-border)] bg-[var(--glass-fill-sidebar)] shadow-glass backdrop-blur-[var(--glass-blur)]">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-[var(--glass-border)] px-4">
           <img
@@ -44,7 +42,9 @@ export function AppLayout({
             <span className="block truncate text-sm font-semibold tracking-tight text-[var(--r115-ink)]">
               Reaper115
             </span>
-            <span className="block truncate text-[11px] text-primary">管理控制台</span>
+            <span className="block truncate text-[11px] text-primary">
+              管理控制台
+            </span>
           </div>
         </div>
 
@@ -113,7 +113,5 @@ export function AppLayout({
 }
 
 function PageTitle() {
-  return (
-    <div className="text-sm font-semibold text-foreground">Reaper115</div>
-  );
+  return <div className="text-sm font-semibold text-foreground">Reaper115</div>;
 }

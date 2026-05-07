@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Building application image..."
-docker build -f Dockerfile -t reaper115-bot:latest -t yelc668/reaper115-bot:latest .
+docker build -f docker/Dockerfile -t reaper115-bot:latest -t yelc668/reaper115-bot:latest .
 
 # 检查应用镜像构建结果
 if [ $? -ne 0 ]; then
