@@ -1,9 +1,8 @@
-# v1.0.0
-
 ## ✨ 新增
 
 - Web 管理界面侧边栏显示当前版本号，更新后一眼可见。
-- 引入语义化版本号机制：`update.md` 首行版本号驱动镜像标签与 GitHub Release，`app/version.py` 为后端读取的版本真源。
+- Telegram bot 使用手册与启动消息显示当前版本号。
+- 引入语义化版本号机制：`app/version.py` 为唯一版本真源，bot / Web / 镜像标签 / GitHub Release 全部据此同步。本文件仅作发布说明（Release notes）。
 
 ## 🐛 修复
 

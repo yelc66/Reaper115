@@ -34,7 +34,11 @@ def telegram_configured():
 
 
 def get_version(md_format=False):
-    version = "v3.4.1"
+    try:
+        from app.version import __version__
+        version = f"v{__version__}"
+    except Exception:
+        version = "unknown"
     if md_format:
         return escape_markdown(version, version=2)
     return version

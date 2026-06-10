@@ -72,12 +72,14 @@ jobs:
           echo "📝 Commit message: ${COMMIT_MSG}"
           echo "🔗 GitHub ref: ${GITHUB_REF}"
           
-          # 0. 优先级0: 从 update.md 读取版本 (作为 Release 的来源)
-          if [[ -f "update.md" ]]; then
-             # 提取版本号: 查找 vX.Y.Z 格式
-             FILE_VERSION=$(grep -oE "v[0-9]+\.[0-9]+\.[0-9]+" update.md | head -n1)
-             if [[ -n "$FILE_VERSION" ]]; then
-               echo "📄 Found version in update.md: $FILE_VERSION"
+          # 0. 优先级0: 从 app/version.py 读取版本 (唯一真源，作为 Release 的来源)
+          #    只改这一个文件的 __version__，bot / Web / 镜像标签 / Release 全部同步。
+          if [[ -f "app/version.py" ]]; then
+             # 只提取 __version__ = "X.Y.Z" 那一行的版本号，并补上 v 前缀
+             RAW_VERSION=$(grep -oE '__version__[[:space:]]*=[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' app/version.py | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -n1)
+             if [[ -n "$RAW_VERSION" ]]; then
+               FILE_VERSION="v${RAW_VERSION}"
+               echo "📄 Found version in app/version.py: $FILE_VERSION"
                echo "file_version=${FILE_VERSION}" >> $GITHUB_OUTPUT
              fi
           fi
@@ -102,11 +104,11 @@ jobs:
             VERSION_SOURCE="git_tag"
             echo "✅ Using git tag version: ${VERSION}"
             
-          # 3. 优先级3: 使用 update.md 中的版本 (如果存在)
+          # 3. 优先级3: 使用 app/version.py 中的版本 (如果存在)
           elif [[ -n "$FILE_VERSION" ]]; then
             VERSION="$FILE_VERSION"
             VERSION_SOURCE="update_md"
-            echo "✅ Using version from update.md: ${VERSION}"
+            echo "✅ Using version from app/version.py: ${VERSION}"
 
           # 4. 优先级4: 从 commit 消息中提取版本号（支持多种格式）
           elif echo "${COMMIT_MSG}" | grep -qE "(v?[0-9]+\.[0-9]+\.[0-9]+)"; then
@@ -307,9 +309,13 @@ jobs:
           fi
           
           # 2. 准备 Release Note
-          # 去掉第一行标题，保留正文
-          tail -n +2 update.md > release_notes.md
-          
+          # update.md 整篇即更新说明（版本号由 app/version.py 决定，此处不含版本标题行）
+          if [[ -f "update.md" ]]; then
+            cp update.md release_notes.md
+          else
+            echo "Release ${VERSION}" > release_notes.md
+          fi
+
           echo "📝 Release Notes:"
           cat release_notes.md
           

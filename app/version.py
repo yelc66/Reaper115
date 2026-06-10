@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""项目版本号（后端读取的版本真源）。
+"""项目版本号 —— 全局唯一真源。
 
-后端 /api/system/status 返回它，Web 前端侧边栏据此显示版本。
+只改本文件的 __version__，以下全部自动同步：
+  - Telegram bot 使用手册 / 启动消息（app/115bot.py:get_version）
+  - Web 后端 /api/system/status → 前端侧边栏
+  - Docker 镜像标签 / GitHub Release（.github/workflows 从此处提取）
 
-发布新版本时（两处必须同步）：
-  1) 修改本文件的 __version__（如 "1.0.1"，不带 v 前缀）。
-  2) 修改根目录 update.md 的首行标题（如 "# v1.0.1"，带 v 前缀），
-     并在其下写本次更新说明 —— 该文件首行决定镜像标签，正文作为 GitHub Release notes。
+发布新版本：改下面的 __version__（如 "1.0.1"，不带 v 前缀），
+并在根目录 update.md 写本次更新说明（仅作 Release notes，不含版本号）。
 版本号规范（语义化）：修 bug +0.0.1，加功能 +0.1.0，不兼容的大改 +1.0.0。
 """
 
