@@ -72,17 +72,130 @@ def check_browser_health(timeout=15):
                 init.logger.warn(f"浏览器健康检查清理失败: {e}")
 
 
+def _prefer_flaresolverr():
+    """是否优先用 Flaresolverr 直取 HTML（绕过 chrome 容器回灌 cookie）。
+
+    config.yaml: flaresolverr_fetch (默认 true，只要配置了 flaresolverr_url 就启用)。
+    设为 false 可强制回到旧的 chrome + cookie 回灌方案。
+    """
+    val = init.bot_config.get("flaresolverr_fetch")
+    if val is None:
+        val = os.getenv("FLARESOLVERR_FETCH")
+    if val is None:
+        return True
+    return str(val).strip().lower() not in ("0", "false", "no", "off", "")
+
+
+def fetch_html_via_flaresolverr(url, cookies=None, timeout_ms=120000):
+    """直接用 Flaresolverr 抓取 url 的最终 HTML。
+
+    Flaresolverr 在它自己的浏览器会话里解 Cloudflare、加载页面并返回渲染后的
+    HTML —— IP / UA / 指纹 / cookie 全部自洽，无需回灌到独立的 chrome 容器。
+
+    Returns: (html, solution_cookies) 或 (None, None)。
+    """
+    flareSolverr = _flaresolverr_url()
+    payload = {"cmd": "request.get", "url": url, "maxTimeout": timeout_ms}
+    if cookies:
+        fs_cookies = []
+        for c in cookies:
+            name = c.get("name")
+            value = c.get("value")
+            if not name or value is None:
+                continue
+            fs_cookies.append({"name": name, "value": str(value)})
+        if fs_cookies:
+            payload["cookies"] = fs_cookies
+    try:
+        resp = requests.post(
+            flareSolverr,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=(timeout_ms / 1000) + 10,
+        )
+        data = resp.json()
+    except Exception as e:
+        init.logger.warn(f"Flaresolverr 直取请求失败: {e}")
+        return None, None
+
+    if data.get("status") != "ok":
+        init.logger.warn(f"Flaresolverr 直取返回非 ok: {data.get('message') or data.get('status')}")
+        return None, None
+
+    solution = data.get("solution") or {}
+    html = solution.get("response")
+    if not html:
+        init.logger.warn("Flaresolverr 直取成功但 response 为空")
+        return None, None
+    return html, solution.get("cookies") or []
+
+
+class _FlaresolverrSession:
+    """Flaresolverr 直取模式下的轻量 driver 占位。
+
+    只实现爬虫真正会调用的 driver 接口（cookie 管理 / refresh / page_source 等），
+    把它们变成存内存的无害操作，避免改动调用方。真正的取页在 SeleniumBrowser.goto 里
+    通过 fetch_html_via_flaresolverr 完成。
+    """
+
+    def __init__(self, base_url=None):
+        self.base_url = base_url
+        self.current_url = base_url or ""
+        self.page_source = ""
+        self.title = ""
+        self._cookies = {}
+
+    def add_cookie(self, cookie):
+        name = cookie.get("name")
+        if name:
+            self._cookies[name] = cookie
+
+    def delete_all_cookies(self):
+        self._cookies.clear()
+
+    def get_cookies(self):
+        return list(self._cookies.values())
+
+    def refresh(self):
+        pass
+
+    def get(self, url):
+        self.current_url = url
+
+    def quit(self):
+        pass
+
+    def execute_script(self, *args, **kwargs):
+        return None
+
+
 class SeleniumBrowser:
     def __init__(self, base_url=None):
         self.base_url = base_url
         self.driver = None
         self.last_error = None
         self.executor = ThreadPoolExecutor(max_workers=1)
+        # Flaresolverr 直取模式下，goto() 抓到的 HTML 暂存于此，供 get_page_source() 返回
+        self._fs_html = None
+        self._fs_cookies = []
+        self.use_flaresolverr_fetch = _prefer_flaresolverr()
 
     async def init_browser(self):
         await asyncio.get_running_loop().run_in_executor(self.executor, self._init_driver)
 
     def _init_driver(self):
+        # 规范化 base_url，无论走哪种取页方式都需要
+        if self.base_url and not self.base_url.startswith('http'):
+            self.base_url = f"https://{self.base_url}"
+
+        if self.use_flaresolverr_fetch:
+            # Flaresolverr 直取模式：不依赖 chrome 容器，标记一个轻量"会话"占位，
+            # 让上层 `if not browser.driver` 的存活检查通过。
+            self.last_error = None
+            self.driver = _FlaresolverrSession(self.base_url)
+            init.logger.info(f"使用 Flaresolverr 直取模式取页，目标站点: {self.base_url}")
+            return
+
         remote_url = _remote_selenium_url()
         if not remote_url:
             self.last_error = "未配置 REMOTE_SELENIUM_URL，无法连接远程 Selenium 浏览器"
@@ -146,6 +259,21 @@ class SeleniumBrowser:
         await asyncio.get_running_loop().run_in_executor(self.executor, self._goto_sync, url)
 
     def _goto_sync(self, url):
+        if self.use_flaresolverr_fetch:
+            # 合并配置 cookie + 上一次 Flaresolverr 解出的 cookie 一起带上
+            extra_cookies = list(self._fs_cookies or [])
+            if isinstance(self.driver, _FlaresolverrSession):
+                extra_cookies = list(self.driver.get_cookies()) + extra_cookies
+            html, cookies = fetch_html_via_flaresolverr(url, cookies=extra_cookies)
+            self._fs_html = html or ""
+            init.logger.debug(f"Flaresolverr 直取 {url} -> {len(self._fs_html)} 字节")
+            if cookies:
+                self._fs_cookies = cookies
+            if isinstance(self.driver, _FlaresolverrSession):
+                self.driver.current_url = url
+                self.driver.page_source = self._fs_html
+            return
+
         if self.driver:
             try:
                 self.driver.get(url)
@@ -154,9 +282,13 @@ class SeleniumBrowser:
                 init.logger.warn(f"Selenium导航失败: {e}")
 
     async def get_page_source(self):
+        if self.use_flaresolverr_fetch:
+            return self._fs_html or ""
         return await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.driver.page_source if self.driver else "")
 
     async def get_cookies(self):
+        if self.use_flaresolverr_fetch:
+            return list(self._fs_cookies or [])
         return await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.driver.get_cookies() if self.driver else [])
 
     async def get_current_url(self):
@@ -184,6 +316,8 @@ class SeleniumBrowser:
         await asyncio.get_running_loop().run_in_executor(self.executor, self._wait_for_element_sync, selector, by, timeout)
 
     def _wait_for_element_sync(self, selector, by, timeout):
+        if self.use_flaresolverr_fetch:
+            return  # Flaresolverr 返回的已是渲染完成的 HTML，无需等待元素
         if not self.driver: return
         try:
             WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, selector)))
@@ -193,6 +327,8 @@ class SeleniumBrowser:
         await asyncio.get_running_loop().run_in_executor(self.executor, self._pass_cloudflare_check_sync)
 
     def _pass_cloudflare_check_sync(self):
+        if self.use_flaresolverr_fetch:
+            return  # Flaresolverr 取页时已在其内部浏览器中处理了 Cloudflare
         if not self.driver:
             return
 

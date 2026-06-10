@@ -40,6 +40,10 @@ sehuatang_spider:
 remote_selenium_url: "http://chrome:4444"
 # FlareSolverr host（留空则不使用，/v1 由代码自动拼接）
 flaresolverr_url: ""
+# true(默认): 直接用 FlareSolverr 抓取渲染后的 HTML，绕过 chrome 容器回灌 cookie 的方式
+#             （推荐，解决 cf_clearance 因 IP/指纹跨容器失配导致一直卡在 Cloudflare 验证页的问题）
+# false:      回退旧方案（chrome 容器 + 把 FlareSolverr 解出的 cookie 回灌刷新）
+flaresolverr_fetch: true
 
 ############################################Web 管理界面##################################
 web:
