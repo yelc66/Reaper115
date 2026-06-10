@@ -58,11 +58,15 @@ jobs:
 
       - name: Extract version from commit or tag
         id: version
+        env:
+          # 通过环境变量传入，避免 ${{ }} 内插把多行/含特殊字符的 commit message
+          # 当成 shell 脚本执行（命令注入）。
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          CUSTOM_VERSION: ${{ github.event.inputs.custom_version }}
         run: |
           # 设置基础信息
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           SHORT_SHA=${GITHUB_SHA::7}
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
           
           echo "🔍 Analyzing version sources..."
           echo "📝 Commit message: ${COMMIT_MSG}"
@@ -79,8 +83,8 @@ jobs:
           fi
 
           # 1. 优先级1: 手动触发的自定义版本
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.custom_version }}" ]]; then
-            VERSION="${{ github.event.inputs.custom_version }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${CUSTOM_VERSION}" ]]; then
+            VERSION="${CUSTOM_VERSION}"
             # 如果手动输入没有 v 前缀且是版本号格式，自动添加 v 前缀
             if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               VERSION="v${VERSION}"
