@@ -75,3 +75,6 @@ clean_policy:
     - ".url"
   # 保护最大文件：目录中体积最大的文件永远不删（即使文件名命中广告模式）
   protect_largest: true
+  # 去除植入正片文件名的广告前缀（形如 489155.com@DLDSS-496-C.mp4 -> DLDSS-496-C.mp4）
+  # 规则：恰六位数字 + ".com@" 开头。true(默认)开启，false 关闭
+  strip_ad_prefix: true

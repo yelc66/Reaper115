@@ -1,8 +1,6 @@
 ## ✨ 新增
 
-- Web 管理界面侧边栏显示当前版本号，更新后一眼可见。
-- Telegram bot 使用手册与启动消息显示当前版本号。
-- 引入语义化版本号机制：`app/version.py` 为唯一版本真源，bot / Web / 镜像标签 / GitHub Release 全部据此同步。本文件仅作发布说明（Release notes）。
+- 广告清理新增「去除植入正片文件名的广告前缀」：形如 `489155.com@DLDSS-496-C.mp4` 自动重命名为 `DLDSS-496-C.mp4`（规则：恰六位数字 + `.com@` 开头）。受 `clean_policy.strip_ad_prefix` 开关控制，默认开启。
 
 ## 🐛 修复
 

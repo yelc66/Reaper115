@@ -1252,6 +1252,10 @@ class OpenAPI_115:
             init.logger.warn(f"获取目录信息失败: {file_info}")
             return
 
+        # 先剥掉正片文件名里被植入的广告前缀（六位数字.com@）。
+        # 放在垃圾文件判断之前，因为带前缀的往往是受保护的正片，目录里未必有其它垃圾文件。
+        self.strip_ad_prefix_in_dir(path)
+
         # 换算字节大小
         byte_size = 0
         less_than = init.bot_config['clean_policy']['less_than']
@@ -1292,6 +1296,49 @@ class OpenAPI_115:
                 init.logger.info(f"[{dir_id}]已添加到清理列表")
             if fid_list:
                 self._batch_delete_files(fid_list)
+
+    # 植入正片文件名的广告前缀，形如 489155.com@DLDSS-496-C.mp4
+    # 规则：恰六位数字 + ".com@"，位于文件名开头（大小写不敏感）
+    _AD_PREFIX_RE = re.compile(r'^\d{6}\.com@', re.IGNORECASE)
+
+    def strip_ad_prefix_in_dir(self, path: str):
+        """剥掉目录内文件名开头被植入的广告前缀（六位数字.com@）并重命名。
+
+        与删除整文件的广告清理不同：这里保留文件本体，只把正片文件名里的
+        广告前缀去掉。受 clean_policy.strip_ad_prefix 开关控制（默认开）。
+        """
+        clean_cfg = init.bot_config.get('clean_policy', {}) or {}
+        if str(clean_cfg.get('strip_ad_prefix', 'true')).lower() == 'false':
+            return
+
+        file_info = self.get_file_info(path)
+        if not file_info or 'file_id' not in file_info:
+            return
+
+        params = {
+            "cid": file_info['file_id'],
+            "limit": 1150,
+            "show_dir": 0,
+            "offset": 0,
+        }
+        files = self.get_file_list(params) or []
+
+        renamed = 0
+        for f in files:
+            fn = f.get('fn', '')
+            fid = f.get('fid')
+            if not fn or not fid:
+                continue
+            new_fn = self._AD_PREFIX_RE.sub('', fn, count=1)
+            if new_fn and new_fn != fn:
+                init.logger.info(f"[去广告前缀] {fn} -> {new_fn}")
+                result = self.rename_by_id(fid, fn, new_fn)
+                if result is True:
+                    renamed += 1
+                time.sleep(0.2)  # 避免请求过快
+
+        if renamed:
+            init.logger.info(f"[{path}] 共去除 {renamed} 个文件的广告前缀")
 
     def _is_ad_filename(self, filename: str, ad_patterns: list) -> bool:
         """文件名是否命中广告关键词（大小写不敏感）。"""
