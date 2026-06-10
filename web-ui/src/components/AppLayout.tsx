@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   Bell,
@@ -10,6 +11,7 @@ import {
   Server,
   Sliders,
 } from "lucide-react";
+import { systemApi } from "../api/queries";
 
 const NAV_ITEMS = [
   { to: "/", label: "仪表盘", icon: Gauge },
@@ -27,6 +29,12 @@ export function AppLayout({
   authRequired?: boolean;
   onLogout?: () => void;
 }) {
+  const statusQuery = useQuery({
+    queryKey: ["system", "status"],
+    queryFn: systemApi.status,
+  });
+  const appVersion = statusQuery.data?.appVersion;
+
   return (
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
@@ -44,6 +52,9 @@ export function AppLayout({
             </span>
             <span className="block truncate text-[11px] text-primary">
               管理控制台
+              {appVersion ? (
+                <span className="ml-1 text-[var(--r115-slate)]">v{appVersion}</span>
+              ) : null}
             </span>
           </div>
         </div>

@@ -71,6 +71,7 @@ export function mapOfflineTask(task: OfflineTaskDto): OfflineTask {
 
 export function mapSystemStatus(status: SystemStatusDto): SystemStatus {
   return {
+    appVersion: status.app_version,
     openapiReady: status.openapi_ready,
     crawlRunning: status.crawl_running,
     debugMode: status.debug_mode,

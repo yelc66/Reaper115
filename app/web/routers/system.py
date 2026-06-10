@@ -15,6 +15,11 @@ from pydantic import BaseModel
 import init
 from app.web.utils import read_yaml, write_yaml
 
+try:
+    from app.version import __version__ as APP_VERSION
+except Exception:  # pragma: no cover - 版本文件缺失时不应阻断服务
+    APP_VERSION = "unknown"
+
 router = APIRouter(prefix="/api/system", tags=["system"])
 
 
@@ -38,6 +43,7 @@ def system_status():
             init.logger.warn(f"获取115用户信息失败: {exc}")
 
     return {
+        "app_version": APP_VERSION,
         "openapi_ready": openapi_ready,
         "crawl_running": init.CRAWL_SEHUA_STATUS == 1,
         "debug_mode": init.debug_mode,

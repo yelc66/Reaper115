@@ -58,6 +58,7 @@ export type CrawlStatusDto = {
 };
 
 export type SystemStatusDto = {
+  app_version?: string;
   openapi_ready: boolean;
   crawl_running: boolean;
   debug_mode: boolean;

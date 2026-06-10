@@ -59,9 +59,6 @@ CloudNAS/
 *.log
 images/qrcode.png
 
-# updated files
-update.md
-
 # OS specific
 .DS_Store
 Thumbs.db
