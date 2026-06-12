@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 import init
 from app.core.selenium_browser import check_browser_health
-from app.web.routers import crawl, dashboard, sehua, strategy, system, tasks
+from app.web.routers import crawl, dashboard, missav, sehua, strategy, system, tasks
 from app.web.utils import install_log_buffer
 
 _DIST_DIR = os.path.join(os.path.dirname(__file__), "dist")
@@ -98,6 +98,7 @@ def create_app():
 
     app.include_router(dashboard.router)
     app.include_router(sehua.router)
+    app.include_router(missav.router)
     app.include_router(strategy.router)
     app.include_router(tasks.router)
     app.include_router(crawl.router)

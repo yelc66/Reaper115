@@ -9,6 +9,7 @@ import { Config } from "./pages/Config";
 import { Crawl } from "./pages/Crawl";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
+import { MissavData } from "./pages/MissavData";
 import { NotFound } from "./pages/NotFound";
 import { SehuaData } from "./pages/SehuaData";
 import { Strategy } from "./pages/Strategy";
@@ -92,6 +93,7 @@ export function App() {
       <Route element={<AppLayout authRequired={authRequired} onLogout={logout} />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/sehua" element={<SehuaData />} />
+        <Route path="/missav" element={<MissavData />} />
         <Route path="/strategy" element={<Strategy />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/crawl" element={<Crawl />} />

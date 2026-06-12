@@ -35,11 +35,49 @@ sehuatang_spider:
   sort_by_year_month: false
   rename_by_title: true
 
+############################################missav 爬虫##################################
+# missav 是「榜单页」模式（无日期维度）：每个榜单爬前 max_items 个番号，
+# 详情页有多条 magnet，按「中文字幕优先，否则容量最大」选一条。入库前用 magnet hash 去重。
+# lists 已内置「今日/本周/本月」三个 views 排序榜单，按需保留或注释。
+missav_spider:
+  enable: false
+  sync_time: "04:00"
+  base_url: missav.ws
+  max_items: 12           # 每个榜单爬取的番号数量上限（榜单页一页约 12 个）
+  lists:
+    - name: 今日热门
+      path: dm296/en/today-hot   # base_url 之后的榜单路径（Today views）
+      save_path: /AV/missav/今日热门
+      rules: []
+      # rules 与涩花同结构（留空表示该榜单所有标题都下载）:
+      # rules:
+      #   - name: 仅中文字幕
+      #     pattern: 中文字幕
+      #     save_path: /AV/missav/中文字幕   # 可选，覆盖榜单路径
+      #     kind: include   # include=包含 / exclude=排除
+      #     active: true
+    # - name: 本周热门
+    #   path: dm170/en/weekly-hot   # Weekly views
+    #   save_path: /AV/missav/本周热门
+    #   rules: []
+    # - name: 本月热门
+    #   path: dm266/en/monthly-hot  # Monthly views
+    #   save_path: /AV/missav/本月热门
+    #   rules: []
+  notify_me: true
+  notify_with_image: false
+  sort_by_year_month: false
+  rename_by_title: true
+
 ############################################远程浏览器##################################
 # 远程 Selenium host（留空则不使用，/wd/hub 由代码自动拼接）
 remote_selenium_url: "http://chrome:4444"
 # FlareSolverr host（留空则不使用，/v1 由代码自动拼接）
 flaresolverr_url: ""
+# true(默认): 直接用 FlareSolverr 抓取渲染后的 HTML，绕过 chrome 容器回灌 cookie 的方式
+#             （推荐，解决 cf_clearance 因 IP/指纹跨容器失配导致一直卡在 Cloudflare 验证页的问题）
+# false:      回退旧方案（chrome 容器 + 把 FlareSolverr 解出的 cookie 回灌刷新）
+flaresolverr_fetch: true
 
 ############################################Web 管理界面##################################
 web:
@@ -71,3 +109,6 @@ clean_policy:
     - ".url"
   # 保护最大文件：目录中体积最大的文件永远不删（即使文件名命中广告模式）
   protect_largest: true
+  # 去除植入正片文件名的广告前缀（形如 489155.com@DLDSS-496-C.mp4 -> DLDSS-496-C.mp4）
+  # 规则：恰六位数字 + ".com@" 开头。true(默认)开启，false 关闭
+  strip_ad_prefix: true

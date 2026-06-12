@@ -32,6 +32,13 @@ const SEHUA_SECTION_OPTIONS = [
   "欧美无码",
 ];
 
+// missav 榜单预设：名称 → 榜单 URL 路径（选名自动带出 path 和 save_path）
+const MISSAV_LIST_OPTIONS: { name: string; path: string }[] = [
+  { name: "今日热门", path: "dm296/en/today-hot" },
+  { name: "本周热门", path: "dm170/en/weekly-hot" },
+  { name: "本月热门", path: "dm266/en/monthly-hot" },
+];
+
 const EMPTY_RULE: SectionRule = {
   name: "",
   pattern: "",
@@ -42,7 +49,8 @@ const EMPTY_RULE: SectionRule = {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SehuaSection = { name: string; savePath: string; rules: SectionRule[] };
+// missav 的榜单比涩花板块多一个 path（榜单 URL 路径），name 自由输入
+type SehuaSection = { name: string; path?: string; savePath: string; rules: SectionRule[] };
 
 type CrawlerFormState = {
   sehuaEnabled: boolean;
@@ -54,14 +62,37 @@ type CrawlerFormState = {
   sehuaSortByYearMonth: boolean;
   sehuaRenameByTitle: boolean;
   sehuaSections: SehuaSection[];
+  // missav
+  missavEnabled: boolean;
+  missavSyncTime: string;
+  missavBaseUrl: string;
+  missavMaxItems: number;
+  missavNotifyMe: boolean;
+  missavNotifyWithImage: boolean;
+  missavSortByYearMonth: boolean;
+  missavRenameByTitle: boolean;
+  missavLists: SehuaSection[];
 };
 
-type EditingState = { sectionIdx: number; ruleIdx: number | null } | null;
+type CrawlerTab = "sehua" | "missav";
+
+type EditingState = { tab: CrawlerTab; sectionIdx: number; ruleIdx: number | null } | null;
 
 // ── Config converters ──────────────────────────────────────────────────────
 
+function mapRules(rules?: unknown[]): SectionRule[] {
+  return ((rules || []) as Array<Record<string, unknown>>).map((r) => ({
+    name: String(r.name || ""),
+    pattern: String(r.pattern || ""),
+    savePath: String(r.save_path || ""),
+    kind: r.kind === "exclude" ? ("exclude" as const) : ("include" as const),
+    active: r.active !== false,
+  }));
+}
+
 function toCrawlerFormState(config: Record<string, unknown>): CrawlerFormState {
   const s = (config.sehuatang_spider ?? {}) as Record<string, unknown>;
+  const m = (config.missav_spider ?? {}) as Record<string, unknown>;
   return {
     sehuaEnabled: (s.enable as boolean) || false,
     sehuaSyncTime: (s.sync_time as string) || "03:00",
@@ -76,13 +107,23 @@ function toCrawlerFormState(config: Record<string, unknown>): CrawlerFormState {
     ).map((sec) => ({
       name: sec.name,
       savePath: sec.save_path,
-      rules: ((sec.rules || []) as Array<Record<string, unknown>>).map((r) => ({
-        name: String(r.name || ""),
-        pattern: String(r.pattern || ""),
-        savePath: String(r.save_path || ""),
-        kind: r.kind === "exclude" ? ("exclude" as const) : ("include" as const),
-        active: r.active !== false,
-      })),
+      rules: mapRules(sec.rules),
+    })),
+    missavEnabled: (m.enable as boolean) || false,
+    missavSyncTime: (m.sync_time as string) || "04:00",
+    missavBaseUrl: (m.base_url as string) || "missav.ws",
+    missavMaxItems: typeof m.max_items === "number" ? (m.max_items as number) : 12,
+    missavNotifyMe: m.notify_me !== false,
+    missavNotifyWithImage: m.notify_with_image === true,
+    missavSortByYearMonth: (m.sort_by_year_month as boolean) || false,
+    missavRenameByTitle: (m.rename_by_title as boolean) || false,
+    missavLists: (
+      (m.lists as Array<{ name: string; path?: string; save_path: string; rules?: unknown[] }> | undefined) || []
+    ).map((lst) => ({
+      name: lst.name,
+      path: lst.path || "",
+      savePath: lst.save_path,
+      rules: mapRules(lst.rules),
     })),
   };
 }
@@ -122,6 +163,33 @@ function toCrawlerApiConfig(form: CrawlerFormState, original: Record<string, unk
         }))
         .filter((sec) => sec.name && sec.save_path),
     },
+    missav_spider: {
+      ...((original.missav_spider as object) || {}),
+      enable: form.missavEnabled,
+      sync_time: form.missavSyncTime,
+      base_url: form.missavBaseUrl,
+      max_items: form.missavMaxItems,
+      notify_me: form.missavNotifyMe,
+      notify_with_image: form.missavNotifyWithImage,
+      sort_by_year_month: form.missavSortByYearMonth,
+      rename_by_title: form.missavRenameByTitle,
+      lists: form.missavLists
+        .map((lst) => ({
+          name: lst.name.trim(),
+          path: (lst.path || "").trim(),
+          save_path: normalizePath(lst.savePath),
+          rules: lst.rules
+            .map((r) => ({
+              name: r.name.trim(),
+              pattern: r.pattern.trim(),
+              save_path: normalizePath(r.savePath),
+              kind: r.kind,
+              active: r.active,
+            }))
+            .filter((r) => r.name && r.pattern),
+        }))
+        .filter((lst) => lst.name && lst.path && lst.save_path),
+    },
   };
 }
 
@@ -131,6 +199,7 @@ export function Strategy() {
   const queryClient = useQueryClient();
   const [crawlerForm, setCrawlerForm] = useState<CrawlerFormState | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown>>({});
+  const [activeTab, setActiveTab] = useState<CrawlerTab>("sehua");
   const [justSaved, setJustSaved] = useState(false);
   const [editing, setEditing] = useState<EditingState>(null);
   const [ruleForm, setRuleForm] = useState<SectionRule>(EMPTY_RULE);
@@ -161,6 +230,11 @@ export function Strategy() {
     mutationFn: () => strategyApi.test(testPattern, testTitle),
   });
 
+  // 当前 Tab 对应的列表字段名（涩花板块 or missav 榜单）
+  const listKey: "sehuaSections" | "missavLists" =
+    activeTab === "sehua" ? "sehuaSections" : "missavLists";
+  const currentList = crawlerForm ? crawlerForm[listKey] : [];
+
   function patchCrawler<K extends keyof CrawlerFormState>(key: K, value: CrawlerFormState[K]) {
     setCrawlerForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
@@ -170,38 +244,47 @@ export function Strategy() {
       if (!prev) return prev;
       return {
         ...prev,
-        sehuaSections: prev.sehuaSections.map((sec, i) => (i === idx ? { ...sec, ...patch } : sec)),
+        [listKey]: prev[listKey].map((sec, i) => (i === idx ? { ...sec, ...patch } : sec)),
       };
     });
   }
 
   function addSection() {
     if (!crawlerForm) return;
-    const used = new Set(crawlerForm.sehuaSections.map((s) => s.name));
-    const defaultName = SEHUA_SECTION_OPTIONS.find((o) => !used.has(o)) ?? SEHUA_SECTION_OPTIONS[0];
-    patchCrawler("sehuaSections", [
-      ...crawlerForm.sehuaSections,
-      { name: defaultName, savePath: `/AV/涩花/${defaultName}`, rules: [] },
-    ]);
+    if (activeTab === "sehua") {
+      const used = new Set(crawlerForm.sehuaSections.map((s) => s.name));
+      const defaultName = SEHUA_SECTION_OPTIONS.find((o) => !used.has(o)) ?? SEHUA_SECTION_OPTIONS[0];
+      patchCrawler("sehuaSections", [
+        ...crawlerForm.sehuaSections,
+        { name: defaultName, savePath: `/AV/涩花/${defaultName}`, rules: [] },
+      ]);
+    } else {
+      const used = new Set(crawlerForm.missavLists.map((l) => l.name));
+      const preset = MISSAV_LIST_OPTIONS.find((o) => !used.has(o.name)) ?? MISSAV_LIST_OPTIONS[0];
+      patchCrawler("missavLists", [
+        ...crawlerForm.missavLists,
+        { name: preset.name, path: preset.path, savePath: `/AV/missav/${preset.name}`, rules: [] },
+      ]);
+    }
   }
 
   function removeSection(idx: number) {
     if (!crawlerForm) return;
-    if (editing?.sectionIdx === idx) setEditing(null);
+    if (editing?.tab === activeTab && editing?.sectionIdx === idx) setEditing(null);
     patchCrawler(
-      "sehuaSections",
-      crawlerForm.sehuaSections.filter((_, i) => i !== idx),
+      listKey,
+      crawlerForm[listKey].filter((_, i) => i !== idx),
     );
   }
 
   function openNewRule(sectionIdx: number) {
-    setEditing({ sectionIdx, ruleIdx: null });
+    setEditing({ tab: activeTab, sectionIdx, ruleIdx: null });
     setRuleForm({ ...EMPTY_RULE });
   }
 
   function openEditRule(sectionIdx: number, ruleIdx: number) {
-    const rule = crawlerForm!.sehuaSections[sectionIdx].rules[ruleIdx];
-    setEditing({ sectionIdx, ruleIdx });
+    const rule = currentList[sectionIdx].rules[ruleIdx];
+    setEditing({ tab: activeTab, sectionIdx, ruleIdx });
     setRuleForm({ ...rule });
   }
 
@@ -221,7 +304,7 @@ export function Strategy() {
       active: ruleForm.active,
     };
     if (!normalized.name || !normalized.pattern) return;
-    const section = crawlerForm.sehuaSections[sectionIdx];
+    const section = currentList[sectionIdx];
     const newRules =
       ruleIdx === null
         ? [...section.rules, normalized]
@@ -232,14 +315,15 @@ export function Strategy() {
 
   function removeRule(sectionIdx: number, ruleIdx: number) {
     if (!crawlerForm) return;
-    if (editing?.sectionIdx === sectionIdx && editing?.ruleIdx === ruleIdx) closeEditor();
-    const section = crawlerForm.sehuaSections[sectionIdx];
+    if (editing?.tab === activeTab && editing?.sectionIdx === sectionIdx && editing?.ruleIdx === ruleIdx)
+      closeEditor();
+    const section = currentList[sectionIdx];
     patchSection(sectionIdx, { rules: section.rules.filter((_, i) => i !== ruleIdx) });
   }
 
   function toggleRule(sectionIdx: number, ruleIdx: number, active: boolean) {
     if (!crawlerForm) return;
-    const section = crawlerForm.sehuaSections[sectionIdx];
+    const section = currentList[sectionIdx];
     patchSection(sectionIdx, {
       rules: section.rules.map((r, i) => (i === ruleIdx ? { ...r, active } : r)),
     });
@@ -280,9 +364,34 @@ export function Strategy() {
         </div>
       ) : null}
 
-      {crawlerForm ? (
+      {/* ── Tab 切换 ── */}
+      <div className="mb-4 flex gap-1 border-b border-border/60">
+        {([
+          { key: "sehua", label: "涩花" },
+          { key: "missav", label: "missav" },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => {
+              setActiveTab(t.key);
+              closeEditor();
+            }}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              activeTab === t.key
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {crawlerForm && activeTab === "sehua" ? (
         <>
-          {/* ── 基础设置 ── */}
+          {/* ── 涩花基础设置 ── */}
           <Card className="mb-4">
             <h2 className="mb-4 text-base font-semibold">基础设置</h2>
             <div className="flex flex-col gap-3">
@@ -341,7 +450,7 @@ export function Strategy() {
             </div>
           </Card>
 
-          {/* ── 板块列表 ── */}
+          {/* ── 涩花板块列表 ── */}
           <div className="mb-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold">板块与规则</h2>
@@ -360,6 +469,7 @@ export function Strategy() {
                 {crawlerForm.sehuaSections.map((sec, sIdx) => (
                   <SectionCard
                     key={sIdx}
+                    tab="sehua"
                     sec={sec}
                     sIdx={sIdx}
                     editing={editing}
@@ -369,6 +479,118 @@ export function Strategy() {
                       const auto = `/AV/涩花/${sec.name}`;
                       const savePath = sec.savePath === auto ? `/AV/涩花/${name}` : sec.savePath;
                       patchSection(sIdx, { name, savePath });
+                    }}
+                    onSectionPathChange={(savePath) => patchSection(sIdx, { savePath })}
+                    onRemoveSection={() => removeSection(sIdx)}
+                    onOpenNewRule={() => openNewRule(sIdx)}
+                    onOpenEditRule={(rIdx) => openEditRule(sIdx, rIdx)}
+                    onRemoveRule={(rIdx) => removeRule(sIdx, rIdx)}
+                    onToggleRule={(rIdx, active) => toggleRule(sIdx, rIdx, active)}
+                    onSubmitRule={submitRule}
+                    onCloseEditor={closeEditor}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : null}
+
+      {crawlerForm && activeTab === "missav" ? (
+        <>
+          {/* ── missav 基础设置 ── */}
+          <Card className="mb-4">
+            <h2 className="mb-4 text-base font-semibold">基础设置</h2>
+            <div className="flex flex-col gap-3">
+              <ConfigRow label="启用爬虫">
+                <Switch
+                  checked={crawlerForm.missavEnabled}
+                  onCheckedChange={(v) => patchCrawler("missavEnabled", v)}
+                />
+              </ConfigRow>
+              <ConfigRow label="每日同步时间" hint="24 小时制">
+                <Input
+                  value={crawlerForm.missavSyncTime}
+                  onChange={(e) => patchCrawler("missavSyncTime", e.target.value)}
+                  className="max-w-28"
+                  placeholder="04:00"
+                />
+              </ConfigRow>
+              <ConfigRow label="基础域名" hint="可填写镜像域名">
+                <Input
+                  value={crawlerForm.missavBaseUrl}
+                  onChange={(e) => patchCrawler("missavBaseUrl", e.target.value)}
+                  placeholder="missav.ws"
+                />
+              </ConfigRow>
+              <ConfigRow label="每榜单番号上限" hint="榜单页一页约 12 个，默认 12">
+                <Input
+                  type="number"
+                  min={1}
+                  value={crawlerForm.missavMaxItems}
+                  onChange={(e) => patchCrawler("missavMaxItems", Number(e.target.value) || 1)}
+                  className="max-w-28"
+                  placeholder="12"
+                />
+              </ConfigRow>
+              <ConfigRow label="发送通知">
+                <Switch
+                  checked={crawlerForm.missavNotifyMe}
+                  onCheckedChange={(v) => patchCrawler("missavNotifyMe", v)}
+                />
+              </ConfigRow>
+              <ConfigRow label="通知带封面图" hint="关闭后跳过图片下载">
+                <Switch
+                  checked={crawlerForm.missavNotifyWithImage}
+                  onCheckedChange={(v) => patchCrawler("missavNotifyWithImage", v)}
+                />
+              </ConfigRow>
+              <ConfigRow label="按年月归档">
+                <Switch
+                  checked={crawlerForm.missavSortByYearMonth}
+                  onCheckedChange={(v) => patchCrawler("missavSortByYearMonth", v)}
+                />
+              </ConfigRow>
+              <ConfigRow label="按标题重命名" hint="清理后将 115 文件夹重命名为标题">
+                <Switch
+                  checked={crawlerForm.missavRenameByTitle}
+                  onCheckedChange={(v) => patchCrawler("missavRenameByTitle", v)}
+                />
+              </ConfigRow>
+            </div>
+          </Card>
+
+          {/* ── missav 榜单列表 ── */}
+          <div className="mb-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold">榜单与规则</h2>
+              <Button type="button" variant="secondary" size="sm" onClick={addSection}>
+                <Plus className="h-3.5 w-3.5" />
+                <span>添加榜单</span>
+              </Button>
+            </div>
+
+            {crawlerForm.missavLists.length === 0 ? (
+              <Card>
+                <EmptyState>还没有配置榜单，点击"添加榜单"开始配置。</EmptyState>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {crawlerForm.missavLists.map((sec, sIdx) => (
+                  <SectionCard
+                    key={sIdx}
+                    tab="missav"
+                    sec={sec}
+                    sIdx={sIdx}
+                    editing={editing}
+                    ruleForm={ruleForm}
+                    setRuleForm={setRuleForm}
+                    onSectionNameChange={(name) => {
+                      // 选预设榜单：自动带出 path；save_path 若仍是自动生成的则一并更新
+                      const preset = MISSAV_LIST_OPTIONS.find((o) => o.name === name);
+                      const auto = `/AV/missav/${sec.name}`;
+                      const savePath = sec.savePath === auto ? `/AV/missav/${name}` : sec.savePath;
+                      patchSection(sIdx, { name, path: preset?.path ?? sec.path, savePath });
                     }}
                     onSectionPathChange={(savePath) => patchSection(sIdx, { savePath })}
                     onRemoveSection={() => removeSection(sIdx)}
@@ -435,6 +657,7 @@ export function Strategy() {
 // ── SectionCard ────────────────────────────────────────────────────────────
 
 type SectionCardProps = {
+  tab: CrawlerTab;
   sec: SehuaSection;
   sIdx: number;
   editing: EditingState;
@@ -452,6 +675,7 @@ type SectionCardProps = {
 };
 
 function SectionCard({
+  tab,
   sec,
   sIdx,
   editing,
@@ -467,7 +691,7 @@ function SectionCard({
   onSubmitRule,
   onCloseEditor,
 }: SectionCardProps) {
-  const isEditing = editing?.sectionIdx === sIdx;
+  const isEditing = editing?.tab === tab && editing?.sectionIdx === sIdx;
   const isEditingNewRule = isEditing && editing?.ruleIdx === null;
 
   return (
@@ -480,14 +704,17 @@ function SectionCard({
             onChange={(e) => onSectionNameChange(e.target.value)}
             className="w-full sm:w-40 shrink-0"
           >
-            {SEHUA_SECTION_OPTIONS.map((opt) => (
+            {(tab === "sehua"
+              ? SEHUA_SECTION_OPTIONS
+              : MISSAV_LIST_OPTIONS.map((o) => o.name)
+            ).map((opt) => (
               <option key={opt}>{opt}</option>
             ))}
           </Select>
           <Input
             value={sec.savePath}
             onChange={(e) => onSectionPathChange(e.target.value)}
-            placeholder="/AV/涩花/..."
+            placeholder={tab === "sehua" ? "/AV/涩花/..." : "/AV/missav/..."}
             className="min-w-0 flex-1"
           />
         </div>

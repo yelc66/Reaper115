@@ -36,6 +36,22 @@ def get_stats():
         """
     )
 
+    # missav 统计（独立子对象，不影响现有涩花字段）
+    missav_total = db_query_one("SELECT COUNT(*) FROM missav_data") or 0
+    missav_submitted = db_query_one("SELECT COUNT(*) FROM missav_data WHERE is_download = 1") or 0
+    missav_finished = db_query_one("SELECT COUNT(*) FROM missav_data WHERE is_download = 2") or 0
+    missav_pending = db_query_one("SELECT COUNT(*) FROM missav_data WHERE is_download = 0") or 0
+    missav_by_list = db_query_all(
+        """
+        SELECT list_name, COUNT(*) AS total,
+               SUM(CASE WHEN is_download >= 1 THEN 1 ELSE 0 END) AS downloaded,
+               SUM(CASE WHEN is_download = 2 THEN 1 ELSE 0 END) AS finished
+        FROM missav_data
+        GROUP BY list_name
+        ORDER BY total DESC
+        """
+    )
+
     return {
         "total": total,
         "downloaded": downloaded,
@@ -45,6 +61,14 @@ def get_stats():
         "retry_pending": retry_pending,
         "by_section": by_section,
         "recent": recent,
+        "missav": {
+            "total": missav_total,
+            "downloaded": missav_submitted + missav_finished,
+            "submitted": missav_submitted,
+            "finished": missav_finished,
+            "pending": missav_pending,
+            "by_list": missav_by_list,
+        },
     }
 
 
