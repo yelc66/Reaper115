@@ -20,20 +20,15 @@ from app.core import sehuatang_spider
 SECTION = "高清中文字幕"
 
 
-def _strategy(rules):
-    return {"sehuatang": {SECTION: rules}}
-
-
 class StrategyMatchingTest(unittest.TestCase):
     def _patch_strategy(self, rules):
-        return patch.multiple(
-            sehuatang_spider,
-            read_yaml_file=lambda _: _strategy(rules),
-            init=type("Init", (), {
-                "STRATEGY_FILE": "/tmp/crawling_strategy.yaml",
-                "logger": logging.getLogger("test_strategy_matching"),
-            })(),
-        )
+        # 规则现在从 init.bot_config['sehuatang_spider']['sections'][].rules 读取
+        # （_active_strategy_rules），不再走 read_yaml_file。
+        fake_init = type("Init", (), {
+            "bot_config": {"sehuatang_spider": {"sections": [{"name": SECTION, "rules": rules}]}},
+            "logger": logging.getLogger("test_strategy_matching"),
+        })()
+        return patch.object(sehuatang_spider, "init", fake_init)
 
     def test_include_rule_allows_matching_title(self):
         with self._patch_strategy([

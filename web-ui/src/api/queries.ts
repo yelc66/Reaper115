@@ -91,6 +91,8 @@ export const missavApi = {
   processStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/missav/process-status")).data,
   delete: async (id: number) => (await api.delete(`/api/missav/${id}`)).data,
   batchDelete: async (ids: number[]) => (await api.delete("/api/missav/batch-delete", { data: { ids } })).data,
+  trigger: async () => (await api.post("/api/missav/trigger")).data,
+  crawlStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/missav/crawl-status")).data,
 };
 
 export const strategyApi = {

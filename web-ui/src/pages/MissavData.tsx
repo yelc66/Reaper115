@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Download, Search, Trash2, Wand2 } from "lucide-react";
+import { Bug, ChevronLeft, ChevronRight, Download, Search, Trash2, Wand2 } from "lucide-react";
 
 import { API_BASE_URL, getStoredAuthKey } from "../api/client";
 import { missavApi } from "../api/queries";
@@ -42,7 +42,14 @@ export function MissavData() {
     refetchInterval: 3000,
   });
 
+  const crawlStatusQuery = useQuery({
+    queryKey: ["missav", "crawl-status"],
+    queryFn: missavApi.crawlStatus,
+    refetchInterval: 3000,
+  });
+
   const processing = processStatusQuery.data?.running ?? false;
+  const crawling = crawlStatusQuery.data?.running ?? false;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["missav"] });
   const downloadMutation = useMutation({ mutationFn: missavApi.download, onSuccess: invalidate });
@@ -63,6 +70,10 @@ export function MissavData() {
   const batchDownloadMutation = useMutation({
     mutationFn: missavApi.batchDownload,
     onSuccess: () => { setSelectedIds([]); invalidate(); },
+  });
+  const triggerMutation = useMutation({
+    mutationFn: missavApi.trigger,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["missav", "crawl-status"] }),
   });
   const removeMutation = useMutation({ mutationFn: missavApi.delete, onSuccess: invalidate });
   const batchDeleteMutation = useMutation({
@@ -104,6 +115,15 @@ export function MissavData() {
         description="查看 missav 榜单爬虫入库的资源，支持筛选、检查和批量导出到离线下载。"
         actions={
           <>
+            <Button
+              size="sm"
+              loading={triggerMutation.isPending}
+              disabled={crawling}
+              onClick={() => triggerMutation.mutate()}
+            >
+              <Bug className="h-3.5 w-3.5" />
+              <span>{crawling ? "抓取中…" : "开始抓取"}</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"

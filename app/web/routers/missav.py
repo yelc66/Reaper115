@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -47,10 +48,40 @@ def _process_manual_download(item: dict):
         init.logger.warn(f"[Web][missav] {title} 缺少磁力或保存路径，跳过")
         return
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 仅当仍为 0（未提交）时才置 1，避免把已提交(1)/已后处理(2)的条目状态拉回
     db_execute(
-        "UPDATE missav_data SET is_download=1, submitted_at=? WHERE id=?",
+        "UPDATE missav_data SET is_download=1, submitted_at=? WHERE id=? AND is_download=0",
         (now_str, item["id"]))
     init.logger.info(f"[Web][missav] {title} 已提交离线，后处理等待下次调度")
+
+
+@router.post("/trigger")
+def trigger_missav_crawl():
+    """Web 端手动触发 missav 爬取（与 /cmv 等价，独立管理 CRAWL_MISSAV_STATUS）。"""
+    if not (init.bot_config.get("missav_spider") or {}).get("enable", False):
+        raise HTTPException(status_code=400, detail="missav 爬虫未启用（missav_spider.enable=false）")
+    if init.CRAWL_MISSAV_STATUS == 1:
+        raise HTTPException(status_code=409, detail="missav 爬取任务正在进行中，请稍候")
+
+    init.CRAWL_MISSAV_STATUS = 1
+    init.logger.info("[Web][missav] Web API 触发 missav 爬取")
+
+    def _run():
+        # missav_spider_manual 在自身 finally 里复位 CRAWL_MISSAV_STATUS=0
+        try:
+            from app.core.missav_spider import missav_spider_manual
+            missav_spider_manual()
+        except Exception as exc:
+            init.logger.error(f"[Web][missav] 触发爬取失败: {exc}")
+            init.CRAWL_MISSAV_STATUS = 0
+
+    threading.Thread(target=_run, name="Web_Missav_Crawl", daemon=True).start()
+    return {"ok": True, "processing": True}
+
+
+@router.get("/crawl-status")
+def missav_crawl_status():
+    return {"running": init.CRAWL_MISSAV_STATUS == 1}
 
 
 @router.get("")

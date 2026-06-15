@@ -41,8 +41,10 @@ _NAV_WORDS = {
     "search", "labels", "series", "chinese-subtitle", "uncensored",
 }
 
-# 中文字幕标识：magnet 行文本含其一即视为字幕版
-_SUB_MARKERS = ("中文字幕", "字幕", "subtitle", "uncensored-leak")
+# 中文字幕标识：magnet 行文本含其一即视为字幕版。
+# missav 详情页字幕行用 [SUB] 标签或 "中文字幕" 文字标注。
+# 注意：不能用裸 "字幕"，因为 missav 用 "无字幕" 标注非字幕版，会把它误判成字幕版。
+_SUB_MARKERS = ("中文字幕", "[SUB]", "subtitle", "uncensored-leak")
 
 
 def get_base_url():
@@ -126,9 +128,8 @@ def _select_best_magnet(soup):
     subs = [c for c in candidates if c[3]]
     pool = subs if subs else candidates
 
-    # 在所选池里取容量最大；都解析不到容量则取第一条
-    pool_sorted = sorted(pool, key=lambda c: c[2], reverse=True)
-    best = pool_sorted[0] if pool_sorted[0][2] >= 0 else pool[0]
+    # 在所选池里取容量最大；解析不到容量(-1)的自然排到末尾，全员-1时即取池中第一条
+    best = sorted(pool, key=lambda c: c[2], reverse=True)[0]
 
     magnet, row_text, size_bytes, is_sub = best
     movie_type = "中文字幕" if is_sub else "无字幕"
@@ -229,7 +230,13 @@ async def list_spider(list_cfg):
 
     results = []
     for i, link in enumerate(detail_links):
-        # 提前用 av_number 跳过策略不允许的标题（标题此时未知，用番号近似），真正过滤在入库
+        # 提前用番号近似当标题做策略过滤：仅命中“排除”规则才跳过详情页抓取（少触发 CF）。
+        # include 规则需真标题才能判定，留到入库 match_strategy 兜底——番号里不会含中文字幕等关键词，
+        # 若此处用 is_title_allowed 会把含 include 规则的整张榜单全部误杀。
+        av_number = _av_number_from_url(link)
+        if _hits_exclude_rule(list_name, av_number):
+            init.logger.info(f"[missav] 番号[{av_number}]命中排除规则，跳过详情页抓取")
+            continue
         if i > 0:
             await asyncio.sleep(random.uniform(2, 5))
         try:
@@ -323,14 +330,21 @@ def _rule_matches(rule, title):
     return bool(pattern and re.search(pattern, title, re.IGNORECASE))
 
 
+def _hits_exclude_rule(list_name, text):
+    """text 是否命中任一“排除”规则。用于列表页提前过滤（仅 exclude 安全，番号不含 include 关键词）。"""
+    for r in _active_strategy_rules(list_name):
+        if r.get('kind', 'include') == 'exclude' and _rule_matches(r, text):
+            return True
+    return False
+
+
 def is_title_allowed(list_name, title):
     rules = _active_strategy_rules(list_name)
     if not rules:
         return True
+    if _hits_exclude_rule(list_name, title):
+        return False
     include_rules = [r for r in rules if r.get('kind', 'include') == 'include']
-    for r in rules:
-        if r.get('kind', 'include') == 'exclude' and _rule_matches(r, title):
-            return False
     if not include_rules:
         return True
     return any(_rule_matches(r, title) for r in include_rules)
