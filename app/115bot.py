@@ -17,6 +17,7 @@ from app.handlers.video_handler import register_video_handlers
 from app.core.scheduler import start_scheduler_in_thread
 from app.handlers.offline_task_handler import register_offline_task_handlers
 from app.handlers.crawl_handler import register_crawl_handlers
+from app.handlers.missav_handler import register_missav_handlers
 from app.handlers.auth_115_handler import register_auth_115_handlers
 from app.web.server import start_web_server_in_thread
 from app.core.selenium_browser import check_browser_health
@@ -244,6 +245,8 @@ if __name__ == '__main__':
         register_offline_task_handlers(application)
         # 手动爬虫
         register_crawl_handlers(application)
+        # missav 手动爬虫
+        register_missav_handlers(application)
         # 115扫码授权
         register_auth_115_handlers(application)
         # 注册视频

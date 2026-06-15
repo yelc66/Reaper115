@@ -1,5 +1,7 @@
 import type {
   DashboardStatsDto,
+  MissavItemDto,
+  MissavListResponseDto,
   OfflineTaskDto,
   SehuaItemDto,
   SehuaListResponseDto,
@@ -53,6 +55,35 @@ export function mapSehuaListResponse(response: SehuaListResponseDto): SehuaListR
     size: response.size,
     total: response.total,
     items: response.items.map(mapSehuaItem),
+  };
+}
+
+// missav 复用 SehuaItem 模型，list_name 映射到 sectionName
+export function mapMissavItem(item: MissavItemDto): SehuaItem {
+  return {
+    id: item.id,
+    sectionName: item.list_name,
+    avNumber: item.av_number,
+    title: item.title,
+    movieType: item.movie_type,
+    size: item.size,
+    magnet: item.magnet,
+    postUrl: item.post_url,
+    publishDate: item.publish_date,
+    pubUrl: item.pub_url,
+    imagePath: item.image_path,
+    savePath: item.save_path,
+    isDownload: item.is_download,
+    createdAt: item.created_at,
+  };
+}
+
+export function mapMissavListResponse(response: MissavListResponseDto): SehuaListResponse {
+  return {
+    page: response.page,
+    size: response.size,
+    total: response.total,
+    items: response.items.map(mapMissavItem),
   };
 }
 

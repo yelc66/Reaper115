@@ -42,6 +42,31 @@ export type SehuaListResponseDto = {
   items: SehuaItemDto[];
 };
 
+// missav 列表项与涩花结构一致，仅 section_name → list_name
+export type MissavItemDto = {
+  id: number;
+  list_name: string;
+  av_number?: string | null;
+  title: string;
+  movie_type?: string | null;
+  size?: string | null;
+  magnet?: string | null;
+  post_url?: string | null;
+  publish_date?: string | null;
+  pub_url?: string | null;
+  image_path?: string | null;
+  save_path?: string | null;
+  is_download: number;
+  created_at?: string | null;
+};
+
+export type MissavListResponseDto = {
+  page: number;
+  size: number;
+  total: number;
+  items: MissavItemDto[];
+};
+
 export type OfflineTaskDto = {
   id: number;
   title: string;

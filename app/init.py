@@ -68,6 +68,9 @@ tg_user_client = None
 CRAWL_SEHUA_STATUS = 0  # 涩花爬取状态
 POST_PROCESS_STATUS = 0  # 涩花后处理状态：0=空闲, 1=运行中
 POLL_WATCHER_RUNNING = False  # 后台轮询后处理线程是否在运行
+CRAWL_MISSAV_STATUS = 0  # missav 爬取状态
+MISSAV_POST_PROCESS_STATUS = 0  # missav 后处理状态：0=空闲, 1=运行中
+MISSAV_POLL_WATCHER_RUNNING = False  # missav 后处理轮询线程是否在运行
 
 
 # yaml配置文件
@@ -346,6 +349,28 @@ def init_db():
             av_number TEXT, -- 番号
             title TEXT, -- 标题
             movie_type TEXT, -- 有码|无码
+            size TEXT, -- 文件大小
+            magnet TEXT, -- 磁力链接
+            post_url TEXT, -- 封面url
+            publish_date DATETIME, -- 发布时间
+            pub_url TEXT, -- 资源链接
+            image_path TEXT, -- 图片本地路径
+            save_path TEXT, -- 保存路径
+            is_download TINYINT DEFAULT 0, -- 0=未提交 1=已提交离线 2=115下载完成+后处理完成
+            submitted_at DATETIME, -- 提交离线时间
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP -- 创建时间，默认当前时间
+        );
+        '''
+        sqlite.execute_sql(create_table_query)
+
+        # missav 资源表，结构对齐 sehua_data，用 list_name 表示榜单名
+        create_table_query = '''
+        CREATE TABLE IF NOT EXISTS missav_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            list_name TEXT, -- 榜单名称
+            av_number TEXT, -- 番号
+            title TEXT, -- 标题
+            movie_type TEXT, -- 有码|无码|中文字幕
             size TEXT, -- 文件大小
             magnet TEXT, -- 磁力链接
             post_url TEXT, -- 封面url

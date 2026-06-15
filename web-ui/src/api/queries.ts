@@ -2,6 +2,7 @@ import { api } from "./client";
 import type {
   CrawlStatusDto,
   DashboardStatsDto,
+  MissavListResponseDto,
   OfflineTaskDto,
   SehuaListResponseDto,
   SystemStatusDto,
@@ -9,6 +10,7 @@ import type {
 } from "./dto";
 import {
   mapDashboardStats,
+  mapMissavListResponse,
   mapOfflineTask,
   mapSehuaListResponse,
   mapSystemStatus,
@@ -66,6 +68,31 @@ export const sehuaApi = {
   processStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/sehua/process-status")).data,
   delete: async (id: number) => (await api.delete(`/api/sehua/${id}`)).data,
   batchDelete: async (ids: number[]) => (await api.delete("/api/sehua/batch-delete", { data: { ids } })).data,
+};
+
+export const missavApi = {
+  list: async (params: SehuaListParams) =>
+    mapMissavListResponse(
+      (
+        await api.get<MissavListResponseDto>("/api/missav", {
+          params: {
+            ...params,
+            status: params.status === "" ? undefined : params.status,
+            section: params.section || undefined,
+            keyword: params.keyword || undefined,
+          },
+        })
+      ).data,
+    ),
+  download: async (id: number) => (await api.post(`/api/missav/${id}/download`)).data,
+  batchDownload: async (ids: number[]) => (await api.post("/api/missav/batch-download", { ids })).data,
+  postProcess: async (id: number) => (await api.post(`/api/missav/${id}/post-process`)).data,
+  batchPostProcess: async () => (await api.post("/api/missav/batch-post-process")).data,
+  processStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/missav/process-status")).data,
+  delete: async (id: number) => (await api.delete(`/api/missav/${id}`)).data,
+  batchDelete: async (ids: number[]) => (await api.delete("/api/missav/batch-delete", { data: { ids } })).data,
+  trigger: async () => (await api.post("/api/missav/trigger")).data,
+  crawlStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/missav/crawl-status")).data,
 };
 
 export const strategyApi = {

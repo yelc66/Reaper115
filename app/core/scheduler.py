@@ -7,6 +7,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.handlers.offline_task_handler import try_to_offline2115_again
 from app.core.sehuatang_spider import sehuatang_spider_start
 from app.core.offline_task_retry import offline_task_retry
+from app.core.missav_spider import missav_spider_start
+from app.core.missav_offline import missav_offline_retry
 
 scheduler = BlockingScheduler()
 
@@ -20,6 +22,19 @@ def get_sehua_sync_time():
         sync_time['minute'] = minute
     except Exception as e:
         init.logger.warn(f"解析涩花同步时间失败: {e}，将使用默认时间 03:00")
+    return sync_time
+
+
+def get_missav_sync_time():
+    sync_time = {'hour': 4, 'minute': 0}
+    missav_config = init.bot_config.get("missav_spider") or {}
+    missav_sync_time = missav_config.get("sync_time", "04:00")
+    try:
+        hour, minute = map(int, missav_sync_time.split(":"))
+        sync_time['hour'] = hour
+        sync_time['minute'] = minute
+    except Exception as e:
+        init.logger.warn(f"解析 missav 同步时间失败: {e}，将使用默认时间 04:00")
     return sync_time
 
 def clear_request_count():
@@ -43,6 +58,14 @@ def init_tasks():
         {"id": "clear_request_count_task", "func": clear_request_count, "hour": 0, "minute": 0, "task_type": "time"},
         {"id": "sehuatang_spider_task", "func": sehuatang_spider_start, "hour": sehua_sync_time.get("hour", 3), "minute": sehua_sync_time.get("minute", 0), "task_type": "time"}
     ]
+
+    # missav 仅在启用时挂载爬虫 + 后处理重试任务
+    if (init.bot_config.get("missav_spider") or {}).get("enable", False):
+        missav_sync_time = get_missav_sync_time()
+        tasks.extend([
+            {"id": "missav_spider_task", "func": missav_spider_start, "hour": missav_sync_time.get("hour", 4), "minute": missav_sync_time.get("minute", 0), "task_type": "time"},
+            {"id": "missav_offline_retry_task", "func": missav_offline_retry, "hour": "10,19", "minute": 0, "task_type": "time"},
+        ])
 
 
 def subscribe_scheduler():

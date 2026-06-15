@@ -1242,7 +1242,7 @@ class OpenAPI_115:
             self._batch_delete_files(fid_list)
             
     
-    def auto_clean_all(self, path, clean_empty_dir=False):
+    def auto_clean_all(self, path, clean_empty_dir=False, protect_sibling_of_largest=False):
          # 开关关闭直接返回
         if str(init.bot_config['clean_policy']['switch']).lower() == "off":
             return
@@ -1268,7 +1268,9 @@ class OpenAPI_115:
                 byte_size = int(less_than[:-1]) * 1024 * 1024 * 1024
         
         # 找到所有垃圾文件
-        junk_file_list = self.find_all_junk_files(file_info['file_id'], 0, byte_size)
+        junk_file_list = self.find_all_junk_files(
+            file_info['file_id'], 0, byte_size,
+            protect_sibling_of_largest=protect_sibling_of_largest)
         if not junk_file_list:
             init.logger.info(f"[{path}]下没有找到需要清理的垃圾文件！")
             return
@@ -1345,7 +1347,8 @@ class OpenAPI_115:
         fn_lower = filename.lower()
         return any(p.lower() in fn_lower for p in ad_patterns if p)
 
-    def find_all_junk_files(self, cid, offset, byte_size, file_list=None, limit=1150):
+    def find_all_junk_files(self, cid, offset, byte_size, file_list=None, limit=1150,
+                            protect_sibling_of_largest=False):
         """
         递归查找垃圾文件。判定规则（同时支持）：
           1. 文件名命中 clean_policy.ad_name_patterns 中的广告关键词
@@ -1353,6 +1356,8 @@ class OpenAPI_115:
 
         clean_policy.protect_largest=true（默认）时，目录内体积最大的文件永远受保护，
         即使文件名命中广告模式也不会被删除，防止误删主视频。
+
+        protect_sibling_of_largest（missav 专用）透传给 _filter_junk，额外保护与正片同名的字幕等。
         """
         if file_list is None:
             file_list = []
@@ -1370,12 +1375,12 @@ class OpenAPI_115:
         current_files = self.get_file_list(params)
 
         if not current_files:
-            return self._filter_junk(file_list, byte_size)
+            return self._filter_junk(file_list, byte_size, protect_sibling_of_largest)
 
         file_list.extend(current_files)
 
         if len(current_files) < limit:
-            return self._filter_junk(file_list, byte_size)
+            return self._filter_junk(file_list, byte_size, protect_sibling_of_largest)
 
         try:
             last_file_size = int(current_files[-1].get('fs', 0))
@@ -1385,17 +1390,30 @@ class OpenAPI_115:
         if last_file_size < byte_size:
             offset += limit
             time.sleep(1)
-            return self.find_all_junk_files(cid, offset, byte_size, file_list)
+            return self.find_all_junk_files(cid, offset, byte_size, file_list,
+                                            protect_sibling_of_largest=protect_sibling_of_largest)
         else:
-            return self._filter_junk(file_list, byte_size)
+            return self._filter_junk(file_list, byte_size, protect_sibling_of_largest)
 
-    def _filter_junk(self, file_list: list, byte_size: int) -> list:
+    @staticmethod
+    def _filename_stem(filename: str) -> str:
+        """取文件名主干（去最后一个扩展名），小写。如 START-583.srt -> start-583"""
+        if '.' in filename:
+            return filename.rsplit('.', 1)[0].strip().lower()
+        return filename.strip().lower()
+
+    def _filter_junk(self, file_list: list, byte_size: int,
+                     protect_sibling_of_largest: bool = False) -> list:
         """
         从 file_list 中筛选出垃圾文件：
           - 文件扩展名命中 ad_extensions → 删（不受 protect_largest 保护）
           - 文件名命中广告模式 → 删
           - 文件大小 < byte_size（且 byte_size > 0）→ 删
         但目录中体积最大的文件受 protect_largest 保护，永不删（扩展名命中除外）。
+
+        protect_sibling_of_largest=True（missav 专用）时，额外保护「与最大文件主文件名
+        相同」的文件（如正片 START-583.mp4 旁的字幕 START-583.srt），避免字幕被当小文件误删。
+        但若该同名文件扩展名命中 ad_extensions 仍会删。
         """
         if not file_list:
             return []
@@ -1405,11 +1423,15 @@ class OpenAPI_115:
         ad_extensions = [e.lower() for e in (clean_cfg.get('ad_extensions') or [])]
         protect_largest = str(clean_cfg.get('protect_largest', 'true')).lower() != 'false'
 
-        # 找出体积最大的文件 fid（受保护）
+        # 找出体积最大的文件 fid（受保护）+ 其主文件名（用于保护同名字幕）
         protected_fid = None
-        if protect_largest and file_list:
+        largest_stem = None
+        if file_list and (protect_largest or protect_sibling_of_largest):
             largest = max(file_list, key=lambda f: int(f.get('fs', 0)))
-            protected_fid = largest.get('fid')
+            if protect_largest:
+                protected_fid = largest.get('fid')
+            if protect_sibling_of_largest:
+                largest_stem = self._filename_stem(largest.get('fn', ''))
 
         junk = []
         for f in file_list:
@@ -1418,7 +1440,7 @@ class OpenAPI_115:
             fs = int(f.get('fs', 0))
             ext = '.' + fn.rsplit('.', 1)[-1].lower() if '.' in fn else ''
 
-            # 扩展名命中：无条件删，不受 protect_largest 保护
+            # 扩展名命中：无条件删，不受任何保护
             if ad_extensions and ext in ad_extensions:
                 init.logger.debug(f"[广告清理] 命中(广告扩展名): {fn}")
                 junk.append(f)
@@ -1426,6 +1448,11 @@ class OpenAPI_115:
 
             if fid == protected_fid:
                 init.logger.debug(f"[广告清理] 保护最大文件，跳过: {fn} ({fs} bytes)")
+                continue
+
+            # 保护与正片同名的文件（如字幕），仅 missav 启用
+            if largest_stem and fid != protected_fid and self._filename_stem(fn) == largest_stem:
+                init.logger.info(f"[广告清理] 保护与正片同名文件（字幕等），跳过: {fn}")
                 continue
 
             is_ad_name = bool(ad_patterns) and self._is_ad_filename(fn, ad_patterns)

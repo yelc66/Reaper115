@@ -1,76 +1,59 @@
 """
-策略 API 保存/读取测试。
+策略 API 测试。
+
+策略规则 CRUD 已下沉到 config.yaml（sehuatang_spider.sections[].rules /
+missav_spider.lists[].rules），经 /api/system/config 读写；规则匹配语义由
+test_strategy_matching.py 覆盖。本文件覆盖现存的 /api/strategy/test 正则测试端点。
 
 运行方式：
-    python3 tests/test_strategy_api.py
+    python tests/test_strategy_api.py
 """
 
 import os
 import sys
-import tempfile
 import types
+import logging
 import unittest
-from unittest.mock import patch
-
-import yaml
+from unittest.mock import MagicMock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 fake_init = types.ModuleType("init")
-fake_init.STRATEGY_FILE = "config/crawling_strategy.yaml"
+fake_init.logger = logging.getLogger("test_strategy_api")
+fake_init.logger.addHandler(logging.NullHandler())
+fake_init.bot_config = {"web": {"enable": True, "auth_key": ""}}
+fake_init.openapi_115 = MagicMock()
 sys.modules["init"] = fake_init
 
-from app.web.routers import strategy
+from app.web.server import create_app
+from fastapi.testclient import TestClient
 
 
-class StrategyApiTest(unittest.TestCase):
-    def _temp_strategy_file(self):
-        temp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".yaml", delete=False)
-        temp.write("{}\n")
-        temp.close()
-        self.addCleanup(lambda: os.path.exists(temp.name) and os.unlink(temp.name))
-        return temp.name
+class StrategyTestEndpoint(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(create_app(), raise_server_exceptions=False)
 
-    def test_create_exclude_rule_preserves_kind_in_response_and_yaml(self):
-        path = self._temp_strategy_file()
-        with patch.object(strategy.init, "STRATEGY_FILE", path):
-            response = strategy.create_rule(strategy.StrategyRule(
-                site="sehuatang",
-                section_name="高清中文字幕",
-                name="广告",
-                pattern="广告",
-                save_path="",
-                kind="exclude",
-                active=True,
-            ))
+    def test_pattern_matches_title(self):
+        r = self.client.post("/api/strategy/test",
+                             json={"pattern": "无码字幕", "title": "SSIS-001 无码字幕"})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["matched"])
 
-            self.assertEqual(response["item"]["kind"], "exclude")
-            self.assertTrue(response["item"]["active"])
+    def test_pattern_case_insensitive(self):
+        r = self.client.post("/api/strategy/test",
+                             json={"pattern": "ssis", "title": "SSIS-001"})
+        self.assertTrue(r.json()["matched"])
 
-            listed = strategy.list_rules()
-            self.assertEqual(listed["items"][0]["kind"], "exclude")
+    def test_pattern_no_match(self):
+        r = self.client.post("/api/strategy/test",
+                             json={"pattern": "广告", "title": "SSIS-001 无码字幕"})
+        self.assertFalse(r.json()["matched"])
 
-            with open(path, "r", encoding="utf-8") as file:
-                saved = yaml.safe_load(file)
-            self.assertEqual(saved["sehuatang"]["高清中文字幕"][0]["kind"], "exclude")
-
-    def test_missing_kind_defaults_to_include(self):
-        path = self._temp_strategy_file()
-        with open(path, "w", encoding="utf-8") as file:
-            yaml.safe_dump({
-                "sehuatang": {
-                    "高清中文字幕": [
-                        {"name": "破解", "pattern": "无码破解", "save_path": ""},
-                    ],
-                },
-            }, file, allow_unicode=True, sort_keys=False)
-
-        with patch.object(strategy.init, "STRATEGY_FILE", path):
-            listed = strategy.list_rules()
-
-        self.assertEqual(listed["items"][0]["kind"], "include")
-        self.assertTrue(listed["items"][0]["active"])
+    def test_invalid_regex_rejected(self):
+        r = self.client.post("/api/strategy/test",
+                             json={"pattern": "[unclosed", "title": "anything"})
+        self.assertNotEqual(r.status_code, 200)
 
 
 if __name__ == "__main__":

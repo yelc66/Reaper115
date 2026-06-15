@@ -45,7 +45,9 @@ _fake_init.bot_config = {
 }
 _fake_init.IMAGE_PATH = "/tmp"
 _fake_init.CRAWL_SEHUA_STATUS = 0
+_fake_init.POLL_WATCHER_RUNNING = False
 _fake_init.openapi_115 = MagicMock()
+_fake_init.get_allowed_user = lambda: _fake_init.bot_config.get("allowed_user")
 
 sys.modules["init"] = _fake_init
 
@@ -248,9 +250,13 @@ def test_phase2_sehua_post_process():
     conn.close()
 
     # 模拟 115 任务列表：id=5 的 MAGNET_D 已完成，id=4 的 MAGNET_B 下载中
+    # 源码用 info_hash(=magnet btih) 做匹配键，故每条任务须带 info_hash
+    from app.utils.utils import get_magnet_hash
     _fake_init.openapi_115.get_offline_tasks.return_value = [
-        {"url": MAGNET_B, "status": 1, "percentDone": 42, "name": "TestB_dir"},
-        {"url": MAGNET_D, "status": 2, "percentDone": 100, "name": "MIDV-010_dir"},
+        {"info_hash": get_magnet_hash(MAGNET_B), "url": MAGNET_B,
+         "status": 1, "percentDone": 42, "name": "TestB_dir"},
+        {"info_hash": get_magnet_hash(MAGNET_D), "url": MAGNET_D,
+         "status": 2, "percentDone": 100, "name": "MIDV-010_dir"},
     ]
     # is_directory: 只有 MIDV-010_dir 是目录
     _fake_init.openapi_115.is_directory.side_effect = lambda p: "MIDV-010_dir" in p

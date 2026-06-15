@@ -4,6 +4,7 @@ import {
   Activity,
   Bell,
   Database,
+  Film,
   Gauge,
   ListTodo,
   LogOut,
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { to: "/config", label: "系统配置", icon: Server },
   { to: "/strategy", label: "抓取策略", icon: Sliders },
   { to: "/sehua", label: "涩花数据", icon: Database },
+  { to: "/missav", label: "missav 数据", icon: Film },
   { to: "/tasks", label: "重试任务", icon: ListTodo },
   { to: "/crawl", label: "手动抓取", icon: Activity },
 ];
