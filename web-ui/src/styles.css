@@ -150,6 +150,17 @@ body[data-theme="dark"] {
   word-break: break-word;
 }
 
+/* ── Title clamp (data table rows) ── */
+.title-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  word-break: break-word;
+}
+
 td,
 th {
   min-width: 0;
