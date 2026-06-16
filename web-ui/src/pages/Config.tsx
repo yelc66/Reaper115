@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, RefreshCw, Save } from "lucide-react";
+import { Eye, EyeOff, KeyRound, RefreshCw, Save } from "lucide-react";
 
 import { API_BASE_URL } from "../api/client";
 import { systemApi } from "../api/queries";
@@ -97,6 +97,7 @@ function useSectionSave(label: string, testAfterSave?: () => Promise<TestResult>
 
 export function Config() {
   const [formState, setFormState] = useState<FormState | null>(null);
+  const [savedState, setSavedState] = useState<FormState | null>(null);
   const [original, setOriginal] = useState<Record<string, unknown>>({});
 
   const configQuery = useQuery({ queryKey: ["system", "config"], queryFn: systemApi.config });
@@ -107,8 +108,10 @@ export function Config() {
 
   useEffect(() => {
     if (configQuery.data?.config) {
+      const parsed = toFormState(configQuery.data.config);
       setOriginal(configQuery.data.config);
-      setFormState(toFormState(configQuery.data.config));
+      setFormState(parsed);
+      setSavedState(parsed);
     }
   }, [configQuery.data]);
 
@@ -116,14 +119,31 @@ export function Config() {
     setFormState((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
-  function saveSection(save: ReturnType<typeof useSectionSave>) {
+  function isDirty(keys: (keyof FormState)[]) {
+    if (!formState || !savedState) return false;
+    return keys.some((k) => formState[k] !== savedState[k]);
+  }
+
+  function saveSection(save: ReturnType<typeof useSectionSave>, keys: (keyof FormState)[]) {
     if (!formState) return;
     save.mutation.mutate(toApiConfig(formState, original));
+    // optimistically mark as saved so dirty indicator resets
+    setSavedState((prev) => {
+      if (!prev || !formState) return prev;
+      const next = { ...prev };
+      for (const k of keys) (next as Record<string, unknown>)[k] = formState[k];
+      return next;
+    });
   }
 
   if (configQuery.isPending) return <LoadingState />;
   if (configQuery.isError) return <ErrorState message={errorMessage(configQuery.error)} />;
   if (!formState) return null;
+
+  const mainKeys: (keyof FormState)[] = ["logLevel", "webEnabled", "webPort", "webAuthKey", "cleanEnabled", "cleanLessThan"];
+  const tgKeys: (keyof FormState)[] = ["botToken", "allowedUser"];
+  const api115Keys: (keyof FormState)[] = ["appId", "accessToken", "refreshToken"];
+  const browserKeys: (keyof FormState)[] = ["remoteSeleniumUrl", "flareSolverrUrl"];
 
   return (
     <>
@@ -137,10 +157,12 @@ export function Config() {
         title="基础设置"
         hint="日志级别、Web 端口、访问密钥和广告文件清理策略。"
         saveState={mainSave}
-        onSave={() => saveSection(mainSave)}
+        dirty={isDirty(mainKeys)}
+        onSave={() => saveSection(mainSave, mainKeys)}
       >
-        <Row label="日志级别">
+        <Row label="日志级别" fieldId="log-level">
           <Select
+            id="log-level"
             value={formState.logLevel}
             onChange={(e) => patch("logLevel", e.target.value)}
             className="max-w-40"
@@ -150,30 +172,32 @@ export function Config() {
             ))}
           </Select>
         </Row>
-        <Row label="Web 端口" hint="重启服务后生效">
+        <Row label="Web 端口" hint="重启服务后生效" fieldId="web-port">
           <Input
+            id="web-port"
             type="number"
             value={formState.webPort}
             onChange={(e) => patch("webPort", e.target.value)}
             className="max-w-28"
           />
         </Row>
-        <Row label="启用 Web UI">
+        <Row label="启用 Web UI" fieldId="web-enabled">
           <Switch checked={formState.webEnabled} onCheckedChange={(v) => patch("webEnabled", v)} />
         </Row>
-        <Row label="Web 访问密钥" hint="留空则不启用认证。WEB_AUTH_KEY 环境变量优先。">
-          <Input
-            type="password"
+        <Row label="Web 访问密钥" hint="留空则不启用认证。WEB_AUTH_KEY 环境变量优先。" fieldId="web-auth-key">
+          <SecretInput
+            id="web-auth-key"
             value={formState.webAuthKey}
-            onChange={(e) => patch("webAuthKey", e.target.value)}
+            onChange={(v) => patch("webAuthKey", v)}
             placeholder="留空则关闭认证"
           />
         </Row>
-        <Row label="广告清理" hint="自动删除小于阈值的文件">
+        <Row label="广告清理" hint="自动删除小于阈值的文件" fieldId="clean-enabled">
           <Switch checked={formState.cleanEnabled} onCheckedChange={(v) => patch("cleanEnabled", v)} />
         </Row>
-        <Row label="最小文件大小" hint="例如 400M / 1G">
+        <Row label="最小文件大小" hint="例如 400M / 1G" fieldId="clean-less-than">
           <Input
+            id="clean-less-than"
             value={formState.cleanLessThan}
             onChange={(e) => patch("cleanLessThan", e.target.value)}
             className="max-w-28"
@@ -186,18 +210,20 @@ export function Config() {
       <Section
         title="Telegram 机器人"
         saveState={tgSave}
-        onSave={() => saveSection(tgSave)}
+        dirty={isDirty(tgKeys)}
+        onSave={() => saveSection(tgSave, tgKeys)}
       >
-        <Row label="Bot Token" hint="通过 @BotFather 创建">
-          <Input
-            type="password"
+        <Row label="Bot Token" hint="通过 @BotFather 创建" fieldId="bot-token">
+          <SecretInput
+            id="bot-token"
             value={formState.botToken}
-            onChange={(e) => patch("botToken", e.target.value)}
+            onChange={(v) => patch("botToken", v)}
             placeholder="填写 Bot Token"
           />
         </Row>
-        <Row label="允许的用户 ID" hint="可通过 @getidsbot 获取，需填写数字 ID">
+        <Row label="允许的用户 ID" hint="可通过 @getidsbot 获取，需填写数字 ID" fieldId="allowed-user">
           <Input
+            id="allowed-user"
             value={formState.allowedUser}
             onChange={(e) => patch("allowedUser", e.target.value)}
             className="max-w-56"
@@ -211,10 +237,12 @@ export function Config() {
         title="115 开放平台"
         hint="填写 App ID 后扫码授权，授权成功后会自动写入 Token。"
         saveState={api115Save}
-        onSave={() => saveSection(api115Save)}
+        dirty={isDirty(api115Keys)}
+        onSave={() => saveSection(api115Save, api115Keys)}
       >
-        <Row label="App ID">
+        <Row label="App ID" fieldId="app-id">
           <Input
+            id="app-id"
             value={formState.appId}
             onChange={(e) => patch("appId", e.target.value)}
             placeholder="填写 115 App ID"
@@ -223,19 +251,19 @@ export function Config() {
         <Row label="扫码授权" hint="首次授权或刷新过期 Token 时使用">
           <QrcodeAuth />
         </Row>
-        <Row label="Access Token">
-          <Input
-            type="password"
+        <Row label="Access Token" fieldId="access-token">
+          <SecretInput
+            id="access-token"
             value={formState.accessToken}
-            onChange={(e) => patch("accessToken", e.target.value)}
+            onChange={(v) => patch("accessToken", v)}
             placeholder="填写 Access Token"
           />
         </Row>
-        <Row label="Refresh Token">
-          <Input
-            type="password"
+        <Row label="Refresh Token" fieldId="refresh-token">
+          <SecretInput
+            id="refresh-token"
             value={formState.refreshToken}
-            onChange={(e) => patch("refreshToken", e.target.value)}
+            onChange={(v) => patch("refreshToken", v)}
             placeholder="填写 Refresh Token"
           />
         </Row>
@@ -246,24 +274,26 @@ export function Config() {
         title="浏览器配置"
         hint="涩花爬虫使用的远程浏览器服务地址，留空则不启用。"
         saveState={browserSave}
-        onSave={() => saveSection(browserSave)}
+        dirty={isDirty(browserKeys)}
+        onSave={() => saveSection(browserSave, browserKeys)}
       >
-        <Row label="远程 Selenium" hint="填写 host，代码自动拼接 /wd/hub">
+        <Row label="远程 Selenium" hint="填写 host，代码自动拼接 /wd/hub" fieldId="selenium-url">
           <Input
+            id="selenium-url"
             value={formState.remoteSeleniumUrl}
             onChange={(e) => patch("remoteSeleniumUrl", e.target.value)}
             placeholder="http://selenium:4444"
           />
         </Row>
-        <Row label="FlareSolverr" hint="填写 host，代码自动拼接 /v1">
+        <Row label="FlareSolverr" hint="填写 host，代码自动拼接 /v1" fieldId="flaresolverr-url">
           <Input
+            id="flaresolverr-url"
             value={formState.flareSolverrUrl}
             onChange={(e) => patch("flareSolverrUrl", e.target.value)}
             placeholder="http://flaresolverr:8191"
           />
         </Row>
       </Section>
-
     </>
   );
 }
@@ -276,12 +306,14 @@ function Section({
   children,
   onSave,
   saveState,
+  dirty,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
   onSave?: () => void;
   saveState?: SectionSaveState;
+  dirty?: boolean;
 }) {
   return (
     <Card className="mb-4">
@@ -292,12 +324,22 @@ function Section({
         </div>
         {onSave && saveState ? (
           <div className="flex max-w-full shrink-0 flex-col items-end gap-1">
-            <Button size="sm" onClick={onSave} loading={saveState.mutation.isPending}>
+            <Button
+              size="sm"
+              variant={dirty ? "primary" : "secondary"}
+              onClick={onSave}
+              loading={saveState.mutation.isPending}
+            >
               <Save className="h-3.5 w-3.5" />
               <span>{saveState.justSaved ? "已保存" : saveState.label}</span>
             </Button>
             {saveState.testResult ? (
-              <p className="max-w-44 break-words text-right text-xs text-emerald-600">{saveState.testResult.message}</p>
+              <p className={cn(
+                "max-w-44 break-words text-right text-xs",
+                saveState.testResult.ok ? "text-emerald-600" : "text-rose-500",
+              )}>
+                {saveState.testResult.message}
+              </p>
             ) : null}
             {saveState.mutation.isError ? (
               <p className="max-w-44 break-words text-right text-xs text-rose-500">{errorMessage(saveState.mutation.error)}</p>
@@ -310,14 +352,64 @@ function Section({
   );
 }
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Row({
+  label,
+  hint,
+  fieldId,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  fieldId?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="config-row">
       <div className="config-row-label">
-        <p className="text-sm font-medium">{label}</p>
+        <label
+          className="text-sm font-medium"
+          htmlFor={fieldId}
+        >
+          {label}
+        </label>
         {hint ? <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="config-row-control">{children}</div>
+    </div>
+  );
+}
+
+function SecretInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative flex w-full min-w-0 items-center">
+      <Input
+        id={id}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pr-9"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((v) => !v)}
+        className="absolute right-2.5 flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition hover:text-foreground"
+        aria-label={show ? "隐藏" : "显示"}
+        tabIndex={-1}
+      >
+        {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
 }

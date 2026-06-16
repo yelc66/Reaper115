@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bug, ChevronLeft, ChevronRight, Download, Search, Trash2, Wand2 } from "lucide-react";
+import { Bug, ChevronLeft, ChevronRight, Download, PauseCircle, PlayCircle, Search, Trash2, Wand2 } from "lucide-react";
 
 import { API_BASE_URL, getStoredAuthKey } from "../api/client";
 import { missavApi } from "../api/queries";
+import type { SehuaItem } from "../api/models";
 import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  Drawer,
+  DrawerField,
   EmptyState,
   ErrorState,
   Input,
@@ -19,7 +23,15 @@ import { errorMessage, formatDateTime } from "../lib/utils";
 
 const PAGE_SIZE = 20;
 
+type LogLevel = "ALL" | "INFO" | "WARNING" | "ERROR";
 type LogItem = { time: string; level: string; message: string };
+
+function statusLabel(v: number) {
+  return v === 2 ? "已完成" : v === 1 ? "待后处理" : "待下载";
+}
+function statusTone(v: number): "success" | "warning" | "default" {
+  return v === 2 ? "success" : v === 1 ? "warning" : "default";
+}
 
 export function MissavData() {
   const queryClient = useQueryClient();
@@ -29,11 +41,20 @@ export function MissavData() {
   const [keyword, setKeyword] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [logs, setLogs] = useState<LogItem[]>([]);
+  const [logLevel, setLogLevel] = useState<LogLevel>("ALL");
+  const [autoscroll, setAutoscroll] = useState(true);
+  const [drawerItem, setDrawerItem] = useState<SehuaItem | null>(null);
+  const [confirmPostProcess, setConfirmPostProcess] = useState(false);
   const logRef = useRef<HTMLDivElement | null>(null);
 
   const missavQuery = useQuery({
     queryKey: ["missav", { page, section, status, keyword }],
     queryFn: () => missavApi.list({ page, size: PAGE_SIZE, section, status, keyword }),
+  });
+
+  const listsQuery = useQuery({
+    queryKey: ["missav", "lists"],
+    queryFn: missavApi.lists,
   });
 
   const processStatusQuery = useQuery({
@@ -81,7 +102,6 @@ export function MissavData() {
     onSuccess: () => { setSelectedIds([]); invalidate(); },
   });
 
-  // SSE log stream — reuse the same /api/crawl/logs endpoint
   useEffect(() => {
     const authKey = getStoredAuthKey();
     const url = authKey
@@ -90,23 +110,32 @@ export function MissavData() {
     const source = new EventSource(url);
     source.addEventListener("log", (event) => {
       const item = JSON.parse((event as MessageEvent).data) as LogItem;
-      setLogs((current) => [...current.slice(-199), item]);
+      setLogs((current) => [...current.slice(-299), item]);
     });
     return () => source.close();
   }, []);
 
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [logs]);
+    if (autoscroll) {
+      logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+    }
+  }, [logs, autoscroll]);
 
   const totalPages = Math.max(1, Math.ceil((missavQuery.data?.total ?? 0) / PAGE_SIZE));
-  const sections = useMemo(
-    () => Array.from(new Set((missavQuery.data?.items ?? []).map((item) => item.sectionName))).filter(Boolean),
-    [missavQuery.data],
-  );
+  const sections = listsQuery.data ?? [];
 
   const items = missavQuery.data?.items ?? [];
   const allSelected = items.length > 0 && selectedIds.length === items.length;
+
+  const pendingCount = useMemo(() => items.filter((i) => i.isDownload === 1).length, [items]);
+
+  const filteredLogs = useMemo(() => {
+    if (logLevel === "ALL") return logs;
+    if (logLevel === "ERROR") return logs.filter((l) => l.level === "ERROR" || l.level === "CRITICAL");
+    return logs.filter((l) => l.level === logLevel);
+  }, [logs, logLevel]);
+
+  const closeDrawer = useCallback(() => setDrawerItem(null), []);
 
   return (
     <>
@@ -132,7 +161,7 @@ export function MissavData() {
               onClick={() => batchDeleteMutation.mutate(selectedIds)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>删除所选</span>
+              <span>删除所选 {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</span>
             </Button>
             <Button
               size="sm"
@@ -141,14 +170,14 @@ export function MissavData() {
               onClick={() => batchDownloadMutation.mutate(selectedIds)}
             >
               <Download className="h-3.5 w-3.5" />
-              <span>导出所选</span>
+              <span>导出所选 {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</span>
             </Button>
             <Button
               variant="secondary"
               size="sm"
               loading={batchPostProcessMutation.isPending}
               disabled={processing}
-              onClick={() => batchPostProcessMutation.mutate()}
+              onClick={() => setConfirmPostProcess(true)}
             >
               <Wand2 className="h-3.5 w-3.5" />
               <span>{processing ? "处理中…" : "一键后处理"}</span>
@@ -216,18 +245,19 @@ export function MissavData() {
                         onChange={(e) => setSelectedIds(e.target.checked ? items.map((i) => i.id) : [])}
                       />
                     </th>
-                    <th className="w-20 pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">ID</th>
                     <th className="pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">标题</th>
-                    <th className="w-24 pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">大小</th>
-                    <th className="w-28 pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">发布时间</th>
                     <th className="w-24 pb-2 pr-4 text-left text-[13px] font-medium text-muted-foreground">状态</th>
                     <th className="w-20 pb-2 text-right text-[13px] font-medium text-muted-foreground" />
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} className="border-t border-border/60">
-                      <td className="py-3 pr-3">
+                    <tr
+                      key={item.id}
+                      className="cursor-pointer border-t border-border/60 transition-colors hover:bg-black/[0.025]"
+                      onClick={() => setDrawerItem(item)}
+                    >
+                      <td className="py-3 pr-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(item.id)}
@@ -238,25 +268,28 @@ export function MissavData() {
                           }
                         />
                       </td>
-                      <td className="py-3 pr-4 font-mono text-muted-foreground">#{item.id}</td>
-                      <td className="max-w-sm py-3 pr-4">
-                        <div className="text-cell font-medium leading-snug">{item.title}</div>
-                        <div className="text-cell mt-0.5 font-mono text-xs text-muted-foreground">
-                          {item.avNumber || item.savePath || "—"}
+                      <td className="py-3 pr-4">
+                        <div className="title-clamp font-medium leading-snug text-foreground">
+                          {item.title}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          {item.avNumber && (
+                            <span className="font-mono text-xs text-primary/80">{item.avNumber}</span>
+                          )}
+                          {item.size && (
+                            <span className="font-mono text-xs text-muted-foreground">{item.size}</span>
+                          )}
+                          {item.sectionName && (
+                            <span className="text-xs text-muted-foreground">{item.sectionName}</span>
+                          )}
                         </div>
                       </td>
-                      <td className="py-3 pr-4 font-mono text-[12px]">{item.size || "—"}</td>
-                      <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                        {formatDateTime(item.publishDate)}
-                      </td>
                       <td className="py-3 pr-4">
-                        <Badge
-                          tone={item.isDownload === 2 ? "success" : item.isDownload === 1 ? "warning" : "default"}
-                        >
-                          {item.isDownload === 2 ? "已完成" : item.isDownload === 1 ? "待后处理" : "待下载"}
+                        <Badge tone={statusTone(item.isDownload)}>
+                          {statusLabel(item.isDownload)}
                         </Badge>
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1.5">
                           {item.isDownload === 0 && (
                             <Button
@@ -304,7 +337,7 @@ export function MissavData() {
           {/* Pagination */}
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-xs text-muted-foreground">
-              第 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, missavQuery.data.total)} 条，共{" "}
+              第 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, missavQuery.data.total)} 条，共{" "}
               {missavQuery.data.total} 条
             </span>
             <div className="flex items-center gap-1.5">
@@ -345,24 +378,50 @@ export function MissavData() {
 
       {/* Live log panel */}
       <Card>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold">后处理日志</h2>
-          <div className="flex items-center gap-2">
+          <Badge tone={processing ? "info" : "default"}>
+            {processing ? "处理中 · SSE" : "空闲"}
+          </Badge>
+          {logs.length > 0 && (
+            <span className="text-xs text-muted-foreground">{logs.length} 条</span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              className="h-7 rounded-md border border-[var(--glass-border)] bg-white/62 px-2 text-xs text-foreground outline-none focus:border-primary/60"
+              value={logLevel}
+              onChange={(e) => setLogLevel(e.target.value as LogLevel)}
+            >
+              <option value="ALL">全部级别</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARN</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAutoscroll((v) => !v)}
+              title={autoscroll ? "暂停自动滚动" : "恢复自动滚动"}
+            >
+              {autoscroll
+                ? <PauseCircle className="h-3.5 w-3.5" />
+                : <PlayCircle className="h-3.5 w-3.5" />}
+              <span>{autoscroll ? "暂停滚动" : "自动滚动"}</span>
+            </Button>
             {logs.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setLogs([])}>
                 清空
               </Button>
             )}
-            <Badge tone={processing ? "info" : "default"}>
-              {processing ? "处理中 · SSE" : "空闲"}
-            </Badge>
           </div>
         </div>
         <div ref={logRef} className="log-pane">
-          {logs.length === 0 ? (
-            <div className="log-empty">- 等待日志 -</div>
+          {filteredLogs.length === 0 ? (
+            <div className="log-empty">
+              {logs.length === 0 ? "- 等待日志 -" : "- 没有符合筛选条件的日志 -"}
+            </div>
           ) : null}
-          {logs.map((item, index) => (
+          {filteredLogs.map((item, index) => (
             <div key={`${item.time}-${index}`} className="log-line">
               <span className="log-time">{item.time}</span>
               <span
@@ -391,6 +450,120 @@ export function MissavData() {
           )}
         </div>
       </Card>
+
+      {/* Detail drawer */}
+      <Drawer
+        open={drawerItem !== null}
+        onClose={closeDrawer}
+        title="资源详情"
+      >
+        {drawerItem && (
+          <>
+            <DrawerField label="标题">
+              <p className="leading-relaxed">{drawerItem.title}</p>
+            </DrawerField>
+            <DrawerField label="状态">
+              <Badge tone={statusTone(drawerItem.isDownload)}>
+                {statusLabel(drawerItem.isDownload)}
+              </Badge>
+            </DrawerField>
+            {drawerItem.avNumber && (
+              <DrawerField label="番号">
+                <span className="font-mono text-primary">{drawerItem.avNumber}</span>
+              </DrawerField>
+            )}
+            {drawerItem.sectionName && (
+              <DrawerField label="榜单">{drawerItem.sectionName}</DrawerField>
+            )}
+            {drawerItem.size && (
+              <DrawerField label="大小">
+                <span className="font-mono">{drawerItem.size}</span>
+              </DrawerField>
+            )}
+            {drawerItem.publishDate && (
+              <DrawerField label="发布时间">
+                <span className="font-mono text-xs">{formatDateTime(drawerItem.publishDate)}</span>
+              </DrawerField>
+            )}
+            {drawerItem.savePath && (
+              <DrawerField label="保存路径">
+                <span className="break-all font-mono text-xs text-muted-foreground">
+                  {drawerItem.savePath}
+                </span>
+              </DrawerField>
+            )}
+            {drawerItem.magnet && (
+              <DrawerField label="磁链">
+                <span className="break-all font-mono text-[11px] text-muted-foreground">
+                  {drawerItem.magnet}
+                </span>
+              </DrawerField>
+            )}
+            {drawerItem.postUrl && (
+              <DrawerField label="来源链接">
+                <a
+                  href={drawerItem.postUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all text-xs text-primary underline-offset-2 hover:underline"
+                >
+                  {drawerItem.postUrl}
+                </a>
+              </DrawerField>
+            )}
+            <div className="mt-6 flex gap-2">
+              {drawerItem.isDownload === 0 && (
+                <Button
+                  size="sm"
+                  loading={downloadMutation.isPending}
+                  onClick={() => { downloadMutation.mutate(drawerItem.id); closeDrawer(); }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>提交离线</span>
+                </Button>
+              )}
+              {drawerItem.isDownload === 1 && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={postProcessMutation.isPending}
+                  disabled={processing}
+                  onClick={() => { postProcessMutation.mutate(drawerItem.id); closeDrawer(); }}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  <span>去广告并重命名</span>
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={removeMutation.isPending}
+                onClick={() => { removeMutation.mutate(drawerItem.id); closeDrawer(); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>删除</span>
+              </Button>
+            </div>
+          </>
+        )}
+      </Drawer>
+
+      {/* Batch post-process confirm */}
+      <ConfirmDialog
+        open={confirmPostProcess}
+        title="一键后处理"
+        message={
+          pendingCount > 0
+            ? `将对当前页 ${pendingCount} 条「待后处理」资源执行去广告和重命名。确认继续？`
+            : "当前页没有「待后处理」状态的资源。仍要执行全量后处理？"
+        }
+        confirmLabel="开始处理"
+        onConfirm={() => {
+          setConfirmPostProcess(false);
+          batchPostProcessMutation.mutate();
+        }}
+        onCancel={() => setConfirmPostProcess(false)}
+      />
     </>
   );
 }

@@ -1,7 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity,
   Bell,
   Database,
   Film,
@@ -21,7 +20,6 @@ const NAV_ITEMS = [
   { to: "/sehua", label: "涩花数据", icon: Database },
   { to: "/missav", label: "missav 数据", icon: Film },
   { to: "/tasks", label: "重试任务", icon: ListTodo },
-  { to: "/crawl", label: "手动抓取", icon: Activity },
 ];
 
 export function AppLayout({

@@ -6,7 +6,6 @@ import { authApi } from "./api/queries";
 import { AppLayout } from "./components/AppLayout";
 import { LoadingState } from "./components/ui";
 import { Config } from "./pages/Config";
-import { Crawl } from "./pages/Crawl";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { MissavData } from "./pages/MissavData";
@@ -96,7 +95,7 @@ export function App() {
         <Route path="/missav" element={<MissavData />} />
         <Route path="/strategy" element={<Strategy />} />
         <Route path="/tasks" element={<Tasks />} />
-        <Route path="/crawl" element={<Crawl />} />
+        <Route path="/crawl" element={<Navigate to="/" replace />} />
         <Route path="/config" element={<Config />} />
         <Route path="/system" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<Navigate to="/" replace />} />

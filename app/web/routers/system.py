@@ -99,6 +99,13 @@ def update_config(payload: ConfigUpdateRequest):
     if new_115 != old_115:
         init.initialize_115open()
 
+    # 配置变更后重载调度任务，使爬虫开关 / 同步时间无需重启即可生效
+    try:
+        from app.core.scheduler import reload_scheduler
+        reload_scheduler()
+    except Exception as e:
+        init.logger.warn(f"重载调度任务失败: {e}")
+
     return {"ok": True, "config": init.bot_config, "restarting": False}
 
 

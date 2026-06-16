@@ -5,8 +5,8 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import { Children } from "react";
-import { Loader2 } from "lucide-react";
+import { Children, useEffect, useRef } from "react";
+import { Loader2, X } from "lucide-react";
 
 import { cn } from "../lib/utils";
 
@@ -280,6 +280,124 @@ export function ErrorState({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-rose-500/20 bg-rose-500/8 p-3 text-sm text-rose-600">
       {message}
+    </div>
+  );
+}
+
+export function Drawer({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div
+        ref={drawerRef}
+        className="relative z-10 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[var(--glass-border)] bg-white/90 shadow-2xl backdrop-blur-xl"
+      >
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-black/6 hover:text-foreground"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function DrawerField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-sm text-foreground">{children}</div>
+    </div>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+  danger,
+}: {
+  open: boolean;
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  danger?: boolean;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter") onConfirm();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, onCancel, onConfirm]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+        onClick={onCancel}
+      />
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-[var(--glass-border)] bg-white/92 p-6 shadow-2xl backdrop-blur-xl">
+        <h3 className="mb-2 text-base font-semibold text-foreground">{title}</h3>
+        <div className="mb-5 text-sm text-muted-foreground">{message}</div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            取消
+          </Button>
+          <Button
+            variant={danger ? "danger" : "primary"}
+            size="sm"
+            onClick={onConfirm}
+          >
+            {confirmLabel ?? "确认"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, RefreshCw, Trash2 } from "lucide-react";
 
@@ -6,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -16,11 +18,16 @@ import { errorMessage, formatDateTime } from "../lib/utils";
 
 export function Tasks() {
   const queryClient = useQueryClient();
+  const [confirmClear, setConfirmClear] = useState(false);
+
   const tasksQuery = useQuery({ queryKey: ["tasks"], queryFn: tasksApi.list });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["tasks"] });
   const retryMutation = useMutation({ mutationFn: tasksApi.retry, onSuccess: refresh });
   const removeMutation = useMutation({ mutationFn: tasksApi.delete, onSuccess: refresh });
-  const clearMutation = useMutation({ mutationFn: tasksApi.clear, onSuccess: refresh });
+  const clearMutation = useMutation({
+    mutationFn: tasksApi.clear,
+    onSuccess: refresh,
+  });
 
   const items = tasksQuery.data?.items ?? [];
   const pending = items.filter((t) => !t.isDownload).length;
@@ -32,17 +39,16 @@ export function Tasks() {
         title="重试任务"
         description="查看等待重试的失败任务，可单独重试或丢弃。"
         actions={
-          <>
-            <Button
-              variant="danger"
-              size="sm"
-              loading={clearMutation.isPending}
-              onClick={() => clearMutation.mutate()}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>清空任务</span>
-            </Button>
-          </>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={clearMutation.isPending}
+            disabled={items.length === 0}
+            onClick={() => setConfirmClear(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>清空任务</span>
+          </Button>
         }
       />
 
@@ -78,7 +84,10 @@ export function Tasks() {
         {tasksQuery.isPending ? <LoadingState /> : null}
         {tasksQuery.isError ? <ErrorState message={errorMessage(tasksQuery.error)} /> : null}
         {items.length === 0 && !tasksQuery.isPending ? (
-          <EmptyState>暂无待重试任务</EmptyState>
+          <EmptyState>
+            <p>暂无待重试任务</p>
+            <p className="mt-1 text-xs">失败的离线下载会自动加入队列，调度器每 12 小时重试一次，最多 6 次。</p>
+          </EmptyState>
         ) : null}
         {items.length > 0 ? (
           <div className="overflow-x-auto">
@@ -96,7 +105,7 @@ export function Tasks() {
                 {items.map((task) => (
                   <tr key={task.id} className="border-t border-border/60">
                     <td className="max-w-sm py-3 pr-4">
-                      <div className="text-cell font-medium leading-snug">{task.title}</div>
+                      <div className="title-clamp font-medium leading-snug">{task.title}</div>
                       <div className="text-cell mt-0.5 font-mono text-xs text-muted-foreground">
                         {task.savePath || task.magnet || "—"}
                       </div>
@@ -106,7 +115,11 @@ export function Tasks() {
                         {task.isDownload ? "已完成" : "待处理"}
                       </Badge>
                     </td>
-                    <td className="py-3 pr-4">{task.retryCount}/6</td>
+                    <td className="py-3 pr-4">
+                      <span className={task.retryCount >= 5 ? "font-mono text-rose-600" : "font-mono"}>
+                        {task.retryCount}/6
+                      </span>
+                    </td>
                     <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
                       {formatDateTime(task.createdAt)}
                     </td>
@@ -139,6 +152,19 @@ export function Tasks() {
           </div>
         ) : null}
       </Card>
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="清空所有任务"
+        message={`将删除队列中全部 ${items.length} 条任务（包括待处理和已完成），此操作不可撤销。`}
+        confirmLabel="确认清空"
+        danger
+        onConfirm={() => {
+          setConfirmClear(false);
+          clearMutation.mutate();
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </>
   );
 }
