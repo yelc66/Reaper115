@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+from zoneinfo import ZoneInfo
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 import init
@@ -10,7 +12,19 @@ from app.core.offline_task_retry import offline_task_retry
 from app.core.missav_spider import missav_spider_start
 from app.core.missav_offline import missav_offline_retry
 
-scheduler = BlockingScheduler()
+
+def _get_scheduler_timezone():
+    # 显式指定时区，不依赖容器系统是否安装 tzdata（slim 镜像默认没有）。
+    # 否则 APScheduler 会回退到 UTC，导致定时任务比预期晚 8 小时触发。
+    tz_name = os.environ.get("TZ") or "Asia/Shanghai"
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        return ZoneInfo("Asia/Shanghai")
+
+
+SCHEDULER_TZ = _get_scheduler_timezone()
+scheduler = BlockingScheduler(timezone=SCHEDULER_TZ)
 
 def get_sehua_sync_time():
     sync_time = {'hour': 3, 'minute': 0}
@@ -81,11 +95,51 @@ def subscribe_scheduler():
             if task['task_type'] == 'time':
                 scheduler.add_job(
                     task["func"],
-                    CronTrigger(hour=task["hour"], minute=task["minute"]),
+                    CronTrigger(hour=task["hour"], minute=task["minute"], timezone=SCHEDULER_TZ),
                     id=task["id"],
                 )
+    init.logger.info(f"调度器时区: {SCHEDULER_TZ}，已挂载任务: {[t['id'] for t in tasks]}")
     if not scheduler.running:
         scheduler.start()
+
+
+def reload_scheduler():
+    """根据当前 init.bot_config 重新计算并同步调度任务。
+
+    用于 Web 端修改配置后无需重启容器即可生效：
+    - 新增/缺失的任务会被添加（如开启 missav 后挂载 missav 任务）
+    - 时间变更的任务会被重新调度（如改了 sync_time）
+    - 不再需要的任务会被移除（如关闭 missav 后卸载 missav 任务）
+    """
+    if not scheduler.running:
+        # 调度器还没起来，交给正常启动流程即可
+        subscribe_scheduler()
+        return
+
+    init_tasks()
+    desired_ids = {task["id"] for task in tasks}
+
+    # 移除不再需要的任务
+    for job in list(scheduler.get_jobs()):
+        if job.id not in desired_ids:
+            scheduler.remove_job(job.id)
+            init.logger.info(f"调度任务已卸载: {job.id}")
+
+    # 添加或更新需要的任务
+    for task in tasks:
+        if task['task_type'] == 'interval':
+            trigger = IntervalTrigger(seconds=task["interval"])
+        else:
+            trigger = CronTrigger(hour=task["hour"], minute=task["minute"], timezone=SCHEDULER_TZ)
+
+        if scheduler.get_job(task["id"]):
+            # 已存在则更新触发器（覆盖时间变更）
+            scheduler.reschedule_job(task["id"], trigger=trigger)
+        else:
+            scheduler.add_job(task["func"], trigger, id=task["id"])
+            init.logger.info(f"调度任务已挂载: {task['id']}")
+
+    init.logger.info(f"调度器已重载，当前任务: {[t['id'] for t in tasks]}")
 
 
 def stop_all_subscriptions():
