@@ -84,12 +84,21 @@ def missav_crawl_status():
     return {"running": init.CRAWL_MISSAV_STATUS == 1}
 
 
+@router.get("/lists")
+def list_distinct_lists():
+    """返回所有已入库的榜单名称（用于前端筛选下拉，不受分页/当前筛选影响）。"""
+    rows = db_query_all(
+        "SELECT DISTINCT list_name FROM missav_data WHERE list_name IS NOT NULL AND list_name != '' ORDER BY list_name"
+    )
+    return {"lists": [row["list_name"] for row in rows]}
+
+
 @router.get("")
 def list_missav(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=200),
     list_name: str | None = Query(None, alias="section"),
-    status: int | None = Query(None, ge=0, le=1),
+    status: int | None = Query(None, ge=0, le=2),
     keyword: str | None = None,
 ):
     where, params = _build_filters(list_name, status, keyword)

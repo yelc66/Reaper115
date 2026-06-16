@@ -93,6 +93,8 @@ export const missavApi = {
   batchDelete: async (ids: number[]) => (await api.delete("/api/missav/batch-delete", { data: { ids } })).data,
   trigger: async () => (await api.post("/api/missav/trigger")).data,
   crawlStatus: async (): Promise<{ running: boolean }> => (await api.get("/api/missav/crawl-status")).data,
+  lists: async (): Promise<string[]> =>
+    (await api.get<{ lists: string[] }>("/api/missav/lists")).data.lists,
 };
 
 export const strategyApi = {

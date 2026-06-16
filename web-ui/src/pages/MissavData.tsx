@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bug, ChevronLeft, ChevronRight, Download, Search, Trash2, Wand2 } from "lucide-react";
 
@@ -34,6 +34,11 @@ export function MissavData() {
   const missavQuery = useQuery({
     queryKey: ["missav", { page, section, status, keyword }],
     queryFn: () => missavApi.list({ page, size: PAGE_SIZE, section, status, keyword }),
+  });
+
+  const listsQuery = useQuery({
+    queryKey: ["missav", "lists"],
+    queryFn: missavApi.lists,
   });
 
   const processStatusQuery = useQuery({
@@ -100,10 +105,7 @@ export function MissavData() {
   }, [logs]);
 
   const totalPages = Math.max(1, Math.ceil((missavQuery.data?.total ?? 0) / PAGE_SIZE));
-  const sections = useMemo(
-    () => Array.from(new Set((missavQuery.data?.items ?? []).map((item) => item.sectionName))).filter(Boolean),
-    [missavQuery.data],
-  );
+  const sections = listsQuery.data ?? [];
 
   const items = missavQuery.data?.items ?? [];
   const allSelected = items.length > 0 && selectedIds.length === items.length;
