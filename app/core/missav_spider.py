@@ -63,6 +63,11 @@ def _build_full_url(path: str):
 # 列表页解析：提取番号详情链接
 # ---------------------------------------------------------------------------
 
+def _to_cn_url(url: str) -> str:
+    """将详情页 URL 从英文版(/en/)切换为中文版(/cn/)，页面标题和界面语言随之变为中文。"""
+    return re.sub(r'/(en)/', '/cn/', url, count=1)
+
+
 def _extract_detail_links(html, max_items):
     """从榜单页 HTML 提取影片详情链接，排除分类导航词，去重，取前 max_items 个。"""
     links = []
@@ -73,9 +78,10 @@ def _extract_detail_links(html, max_items):
             continue
         # 影片详情番号特征：字母+数字（abp-123 / ssis-456 / fc2-ppv-1234567）或纯数字
         if re.match(r"^[a-z0-9]+-[a-z0-9-]*\d+$", tail) or re.match(r"^\d{6,}$", tail):
-            if href not in seen:
-                seen.add(href)
-                links.append(href)
+            cn_href = _to_cn_url(href)
+            if cn_href not in seen:
+                seen.add(cn_href)
+                links.append(cn_href)
         if len(links) >= max_items:
             break
     return links
