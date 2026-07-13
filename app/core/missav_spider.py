@@ -1,4 +1,4 @@
-"""missav 爬虫：榜单页 → 番号详情 → magnet（中文字幕优先，否则容量最大）。
+"""missav 爬虫：榜单页 → 番号详情 → magnet（中文字幕+UC破解优先，同优先度选清晰度最大）。
 
 与 sehuatang_spider 平行，但 missav 是「榜单页」模式（无日期维度），
 靠 magnet hash 去重避免重复入库。HTML 抓取走 SeleniumBrowser（内建 FlareSolverr 过 CF）。
@@ -43,8 +43,10 @@ _NAV_WORDS = {
 
 # 中文字幕标识：magnet 行文本含其一即视为字幕版。
 # missav 详情页字幕行用 [SUB] 标签或 "中文字幕" 文字标注。
-# 注意：不能用裸 "字幕"，因为 missav 用 "无字幕" 标注非字幕版，会把它误判成字幕版。
-_SUB_MARKERS = ("中文字幕", "[SUB]", "subtitle", "uncensored-leak")
+_SUB_MARKERS = ("中文字幕", "[SUB]", "subtitle")
+
+# UC/破解标识：无码/破解等版本。
+_UC_MARKERS = ("uncensored", "无码", "破解", "uncensored-leak", "uc")
 
 
 def get_base_url():
@@ -88,7 +90,7 @@ def _extract_detail_links(html, max_items):
 
 
 # ---------------------------------------------------------------------------
-# 详情页解析：选 magnet（中文字幕优先，否则容量最大）
+# 详情页解析：选 magnet（中文/UC 优先，再按清晰度选最大文件）
 # ---------------------------------------------------------------------------
 
 _SIZE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*([GMK])B", re.IGNORECASE)
@@ -112,11 +114,11 @@ def _av_number_from_url(url):
 
 
 def _select_best_magnet(soup):
-    """遍历详情页所有 magnet 行，按「中文字幕优先，否则容量最大」选一条。
+    """遍历详情页所有 magnet 行，按 中文字幕+UC破解 > 中文字幕 > UC破解 > 清晰度 选一条。
 
     返回 (magnet, movie_type, size_text)；无 magnet 返回 (None, None, None)。
     """
-    candidates = []  # [(magnet, row_text, size_bytes, is_sub)]
+    candidates = []  # [(magnet, row_text, size_bytes, priority, is_sub, is_uc)]
     for a in soup.find_all("a", href=re.compile(r"^magnet:")):
         magnet = htmllib.unescape(a.get("href", "")).strip()
         if not magnet.startswith("magnet:"):
@@ -125,23 +127,30 @@ def _select_best_magnet(soup):
         row_text = row.get_text(" ", strip=True)
         size_bytes = _parse_size_bytes(row_text)
         is_sub = any(mk in row_text for mk in _SUB_MARKERS)
-        candidates.append((magnet, row_text, size_bytes, is_sub))
+        is_uc = any(mk in row_text for mk in _UC_MARKERS)
+        priority = (3 if (is_sub and is_uc) else 2 if is_sub else 1 if is_uc else 0)
+        candidates.append((magnet, row_text, size_bytes, priority, is_sub, is_uc))
 
     if not candidates:
         return None, None, None
 
-    # 优先中文字幕版
-    subs = [c for c in candidates if c[3]]
-    pool = subs if subs else candidates
+    # 按 priority DESC, size DESC 排序
+    best = sorted(candidates, key=lambda c: (c[3], c[2]), reverse=True)[0]
 
-    # 在所选池里取容量最大；解析不到容量(-1)的自然排到末尾，全员-1时即取池中第一条
-    best = sorted(pool, key=lambda c: c[2], reverse=True)[0]
-
-    magnet, row_text, size_bytes, is_sub = best
-    movie_type = "中文字幕" if is_sub else "无字幕"
+    magnet, row_text, size_bytes, priority, is_sub, is_uc = best
+    movie_type = _build_movie_type(is_sub, is_uc)
     size_m = _SIZE_RE.search(row_text)
     size_text = size_m.group(0) if size_m else None
     return magnet, movie_type, size_text
+
+
+def _build_movie_type(is_sub, is_uc):
+    tags = []
+    if is_sub:
+        tags.append("中文字幕")
+    if is_uc:
+        tags.append("破解")
+    return "+".join(tags) if tags else "无字幕"
 
 
 def parse_detail(html, url, list_name):
