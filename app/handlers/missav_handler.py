@@ -25,6 +25,28 @@ async def crawl_missav(update: Update, context: ContextTypes.DEFAULT_TYPE):
     thread.start()
 
 
+async def emby_hot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not init.check_user(update.message.from_user.id):
+        await update.message.reply_text("⚠️ 对不起，您无权使用115机器人！")
+        return
+    cfg = init.bot_config.get('emby') or {}
+    if not cfg.get('url') or not cfg.get('api_key'):
+        await update.message.reply_text("⚠️ 未配置 emby.url / emby.api_key")
+        return
+    await update.message.reply_text("🔥 开始同步 Emby 热门合集，请稍后...")
+    from app.core.emby_hot import run_emby_hot
+
+    def _job():
+        res = run_emby_hot(force=True)
+        from app.utils.message_queue import add_task_to_queue
+        from telegram.helpers import escape_markdown
+        msg = "❌ Emby 热门合集同步失败，详见日志" if res is None else "\n".join(
+            f"✅ {r['collection']}: 库中 {r['owned']}，+{r['added']} -{r['removed']}，缺 {len(r['missing'])}" for r in res) or "榜单为空"
+        add_task_to_queue(init.get_allowed_user(), None, escape_markdown(msg, version=2))
+    threading.Thread(target=_job, daemon=True).start()
+
+
 def register_missav_handlers(application):
     application.add_handler(CommandHandler('cmv', crawl_missav))
+    application.add_handler(CommandHandler('embyhot', emby_hot))
     init.logger.info("✅ Missav处理器已注册")

@@ -43,6 +43,14 @@ Reaper115 是一个基于 Python 的 Telegram Bot 项目，聚焦涩花资源自
 - 源目录无剩余正片时才删除（仅非 dry-run）
 - 解析逻辑见 `app/core/organize.py`，测试：`pytest tests/test_organize.py`
 
+### Emby 热门合集（可选，默认关闭）
+
+开启 `emby.enabled` 后，每天 `emby.sync_time` 抓取 missav 今日/本周/本月热门榜单（只读榜单页，不下载），按番号在 Emby 中查找已有影片，同步为合集「今日热门 / 本周热门 / 本月热门」：新上榜的加入、掉榜的移除。TG 发送 `/embyhot` 可手动触发。
+
+- 配置项：`url`、`api_key`、`user_id`（可选）、`sync_time`、`max_items`、`collections`（榜单→合集名）、`list_paths`（可选）
+- 番号匹配复用 `organize` 的解析规则（文件名/路径/名称）；同一番号多版本都会加入合集
+- 测试：`pytest tests/test_emby_hot.py`
+
 ## 快速开始
 
 ### 环境要求
