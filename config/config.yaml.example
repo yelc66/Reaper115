@@ -69,6 +69,23 @@ missav_spider:
   sort_by_year_month: false
   rename_by_title: true
 
+############################################Emby 热门合集##################################
+# 把 missav 今日/本周/本月热门榜单里「Emby 库中已有」的番号同步为 Emby 合集（只抓榜单页，不下载）。
+# 手动触发：TG 发送 /embyhot
+emby:
+  enabled: false
+  url: http://192.168.1.2:8096
+  api_key: ""              # Emby 控制台 → 高级 → API 密钥
+  user_id: ""              # 可选
+  sync_time: "05:00"
+  max_items: 12            # 每个榜单取前 N 个番号
+  collections:             # 榜单 → 合集名（删掉某行即不同步该榜单）
+    today-hot: 今日热门
+    weekly-hot: 本周热门
+    monthly-hot: 本月热门
+  # list_paths:            # 可选：覆盖榜单路径（站点取 missav_spider.base_url）
+  #   today-hot: dm296/en/today-hot
+
 ############################################远程浏览器##################################
 # 远程 Selenium host（留空则不使用，/wd/hub 由代码自动拼接）
 remote_selenium_url: "http://chrome:4444"
@@ -85,6 +102,29 @@ web:
   port: 8115
   auth_key: ""
 
+############################################按番号整理(可选)##################################
+# 离线完成并清理/重命名后，按番号把正片移动到 {root}/{分类}/{番号}/，
+# 并改名为 Emby 多版本格式: "MIDA-752 - C.mp4" / "MIDA-752 - UC.mp4" / "MIDA-752.mp4"
+# 版本后缀: -C=中文字幕(C)  -UC=无码破解+中文字幕(UC)  -U=无码破解(U)
+organize:
+  enabled: false
+  dry_run: true            # true 时只打印计划动作，不调用 115 写接口
+  root: /涩花/整理
+  api_interval_sec: 1.0    # 每次 115 API 调用之间的间隔，降低风控风险
+  default_category: 未知   # 未识别的文件保留原位，不移动
+  categories:              # 与 MDC-NG category_mapping 一致，按番号正则匹配，首条命中生效
+    - name: FC2
+      pattern: '^FC2-PPV-'
+    - name: 欧美
+      pattern: '^[A-Za-z][A-Za-z0-9]*\.\d{2}\.\d{2}\.\d{2}'
+    - name: 日本无码
+      pattern: '^(?:HEYZO-|\d{6}[-_]\d{2,3}$|[NK]\d{4}$|[HC]\d{4}-|CARIB|1PON|10MU|PACOPACOMAMA)'
+    - name: 素人
+      pattern: '^(?:\d{3}[A-Z]{2,6}-\d{3,5}$|SIRO-|ARA-|KNB-|DCV-|MAAN-|SCUTE-)'
+    - name: 日本有码
+      pattern: '^[A-Z]{2,6}-\d{2,5}$'
+    # - name: 国产        # 暂无规则
+    #   pattern: '...'
 ############################################广告清理##################################
 clean_policy:
   switch: "on"

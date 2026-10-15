@@ -1,8 +1,6 @@
-## ✨ 新增
-
-- 广告清理新增「去除植入正片文件名的广告前缀」：形如 `489155.com@DLDSS-496-C.mp4` 自动重命名为 `DLDSS-496-C.mp4`（规则：恰六位数字 + `.com@` 开头）。受 `clean_policy.strip_ad_prefix` 开关控制，默认开启。
-
-## 🐛 修复
-
-- 修复爬虫一直卡在 Cloudflare 验证页的问题：改为直接使用 FlareSolverr 返回的渲染后 HTML，绕过把 cookie 回灌到独立 chrome 容器（因出口 IP/指纹跨容器失配导致 cf_clearance 失效）的环节。可用 `flaresolverr_fetch` 开关回退旧方案。
-- 修复 CI 构建因 commit message 含多行/特殊字符被当成 shell 命令执行（命令注入）而失败的问题。
+- 新增：离线下载完成后可选按番号整理（organize，默认关闭，支持 dry_run）
+  - 分类与 MDC-NG 对齐：日本有码 / 日本无码 / 素人 / FC2 / 国产 / 欧美 / 未知
+  - 目标结构：/涩花/整理/{分类}/{番号}/{番号} - {版本}[-cdN].ext
+  - 识别 -C / -UC / -U 版本、多分段（-C1、-CD1、-PT1、_1、A/B/C/D）、无码日期番号片商（CARIB/1PON/10MU/PACO/CARIBPR）、清晰度标记
+  - 真重复保留为 " - C2" / " - 2"
+- 新增：Emby 热门合集（emby，默认关闭）：missav 今日/本周/本月热门榜单中库内已有的影片同步为 Emby 合集，每日定时 + TG /embyhot 手动触发

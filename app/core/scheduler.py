@@ -11,6 +11,7 @@ from app.core.sehuatang_spider import sehuatang_spider_start
 from app.core.offline_task_retry import offline_task_retry
 from app.core.missav_spider import missav_spider_start
 from app.core.missav_offline import missav_offline_retry
+from app.core.emby_hot import run_emby_hot
 
 
 def _get_scheduler_timezone():
@@ -51,6 +52,16 @@ def get_missav_sync_time():
         init.logger.warn(f"解析 missav 同步时间失败: {e}，将使用默认时间 04:00")
     return sync_time
 
+def get_emby_sync_time():
+    emby_cfg = init.bot_config.get("emby") or {}
+    try:
+        hour, minute = map(int, str(emby_cfg.get("sync_time", "05:00")).split(":"))
+        return {'hour': hour, 'minute': minute}
+    except Exception as e:
+        init.logger.warn(f"解析 Emby 热门同步时间失败: {e}，将使用默认时间 05:00")
+        return {'hour': 5, 'minute': 0}
+
+
 def clear_request_count():
     if init.openapi_115 is None:
         return
@@ -80,6 +91,11 @@ def init_tasks():
             {"id": "missav_spider_task", "func": missav_spider_start, "hour": missav_sync_time.get("hour", 4), "minute": missav_sync_time.get("minute", 0), "task_type": "time"},
             {"id": "missav_offline_retry_task", "func": missav_offline_retry, "hour": "10,19", "minute": 0, "task_type": "time"},
         ])
+
+    # Emby 热门合集仅在启用时挂载
+    if (init.bot_config.get("emby") or {}).get("enabled", False):
+        t = get_emby_sync_time()
+        tasks.append({"id": "emby_hot_task", "func": run_emby_hot, "hour": t["hour"], "minute": t["minute"], "task_type": "time"})
 
 
 def subscribe_scheduler():
