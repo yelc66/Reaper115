@@ -229,7 +229,8 @@ def sehua_post_process():
                 final_path = f"{save_path}/{resource_name}"
                 if init.openapi_115.is_directory(final_path):
                     init.openapi_115.auto_clean_all(final_path)
-                    _rename_by_title(final_path, title)
+                    final_path = _rename_by_title(final_path, title)
+                    _organize_by_number(final_path)
                 else:
                     init.logger.info(f"[涩花后处理] {title} 为单文件，跳过广告清理和重命名")
             except Exception as e:
@@ -297,21 +298,35 @@ def _sanitize_title(title: str) -> str:
 
 def _rename_by_title(final_path: str, title: str):
     """在广告清理后，按 sehua 标题重命名目录（可通过 rename_by_title 配置关闭）"""
+    """返回重命名后的目录路径（未重命名则返回原路径）"""
     if not init.bot_config.get('sehuatang_spider', {}).get('rename_by_title', False):
-        return
+        return final_path
     new_name = _sanitize_title(title)
     if not new_name:
         init.logger.warn(f"[涩花后处理] 标题为空，跳过重命名: {final_path}")
-        return
+        return final_path
     current_name = os.path.basename(final_path)
     if current_name == new_name:
         init.logger.info(f"[涩花后处理] 目录名与标题一致，无需重命名: {new_name}")
-        return
+        return final_path
     ok = init.openapi_115.rename(final_path, new_name)
-    if ok:
+    if ok is True:
         init.logger.info(f"[涩花后处理] 重命名成功: [{current_name}] → [{new_name}]")
-    else:
-        init.logger.warn(f"[涩花后处理] 重命名失败: [{current_name}] → [{new_name}]")
+        return f"{os.path.dirname(final_path)}/{new_name}"
+    init.logger.warn(f"[涩花后处理] 重命名失败: [{current_name}] → [{new_name}]")
+    return final_path
+
+
+def _organize_by_number(final_path: str):
+    """可选：按番号整理到 organize.root/{分类}/{番号}/（organize.enabled 控制，默认关闭）"""
+    cfg = init.bot_config.get('organize', {}) or {}
+    if not cfg.get('enabled', False):
+        return
+    try:
+        from app.core.organize import Organizer
+        Organizer(init.openapi_115, cfg, init.logger).organize_dir(final_path)
+    except Exception as e:
+        init.logger.error(f"[整理] {final_path} 整理失败: {e}")
 
 
 def del_images(images):
