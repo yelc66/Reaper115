@@ -878,6 +878,17 @@ async def age_check():
         age_indicators = ["满18岁，请点此进入", "满18岁,请点此进入", "满18岁"]
         if any(ind in content for ind in age_indicators):
             init.logger.info("  检测到年龄验证页面，尝试通过多种方式进入...")
+            if getattr(browser, "use_flaresolverr_fetch", False):
+                # 直取模式没有 DOM 可点击：带上年龄 cookie 重新请求当前页
+                for name in ("_safe_age", "agecheck", "age_verified"):
+                    await browser.add_cookie({"name": name, "value": "1", "path": "/"})
+                await browser.refresh()
+                new_content = await browser.get_page_source()
+                if any(ind in new_content for ind in age_indicators):
+                    init.logger.warn("  直取模式重新请求后仍是年龄验证页")
+                else:
+                    init.logger.info(f"  直取模式年龄验证通过，页面 {len(new_content)} 字节")
+                return
             initial_url = await browser.get_current_url()
             passed = False
 
@@ -938,11 +949,13 @@ async def safeid_check():
                 }
                 
                 # 在 driver 线程中执行 cookie 添加操作
-                await browser.run_with_driver(lambda d: d.add_cookie(cookie_dict))
-                
+                await browser.add_cookie(cookie_dict)
+
                 init.logger.info("safeid cookie 添加成功，刷新页面...")
-                await browser.run_with_driver(lambda d: d.refresh())
-                await asyncio.sleep(3) # 等待刷新完成
+                await browser.refresh()  # 直取模式下会带 cookie 重新请求同一 URL
+                if not getattr(browser, "use_flaresolverr_fetch", False):
+                    await asyncio.sleep(3) # 等待刷新完成
+                init.logger.info(f"safeid 刷新后页面 {len(await browser.get_page_source())} 字节")
                 
                 # 再次等待元素加载
                 await browser.wait_for_element("tbody[id^='normalthread_']")

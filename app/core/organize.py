@@ -53,7 +53,7 @@ STUDIOS = [
     (re.compile(r'PACO(?:PACOMAMA|PACOM)?', re.I), "PACO", "_"),
 ]
 _STUDIO_TAIL_RE = re.compile(r'^[-_ ]*(?:CARIB\w*|1PON\w*|10MU\w*|PACO\w*)', re.I)
-_QUALITY_RE = re.compile(r'^(?:[-_ .]?(?:FHD|HD|SD|UHD|4K|2160p|1080p|720p|GIFT|V(?=[-_]))(?![A-Za-z0-9]))+', re.I)
+_QUALITY_RE = re.compile(r'^(?:[-_ .]?(?:FHD|HD|SD|UHD|4K(?:S|B|60)?|8K|2160p|1080p|720p|GIFT|V(?=[-_]))(?![A-Za-z0-9]))+', re.I)
 _RES_RE = re.compile(r'^[-_ .]?(?:4K|2160p|1080p|720p)', re.I)
 
 

@@ -15,6 +15,10 @@ import pytest
     ("010123-001.mkv", "010123-001", None, None, "010123-001.mkv"),
     ("ABP-123-CD1.mp4", "ABP-123", None, 1, "ABP-123 - cd1.mp4"),
     ("ABP-123-C-cd2.mp4", "ABP-123", "C", 2, "ABP-123 - C-cd2.mp4"),
+    ("DLDSS-559_4KS.mp4", "DLDSS-559", None, None, "DLDSS-559.mp4"),
+    ("DLDSS-559-4K.mp4", "DLDSS-559", None, None, "DLDSS-559.mp4"),
+    ("DLDSS-559_4KB-C.mp4", "DLDSS-559", "C", None, "DLDSS-559 - C.mp4"),
+    ("DLDSS-559-4KS-cd2.mp4", "DLDSS-559", None, 2, "DLDSS-559 - cd2.mp4"),
 ])
 def test_parse(fn, num, ver, part, target):
     p = org.parse_video_name(fn)
