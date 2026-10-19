@@ -55,10 +55,13 @@ class AttemptStore:
         with sqlite3.connect(db_file) as c:
             c.execute(_ATTEMPT_DDL)
 
-    def recently_tried(self, number: str, days: int, now=None) -> bool:
+    def recently_tried(self, number: str, days: int, now=None, days_not_found: Optional[int] = None) -> bool:
+        """days_not_found: status=not_found 时改用的冷却天数（新片常常过几天才出 magnet）。"""
         now = now or datetime.datetime.now()
         with sqlite3.connect(self.db_file) as c:
-            row = c.execute("SELECT last_try FROM emby_hot_attempts WHERE av_number=?", (number,)).fetchone()
+            row = c.execute("SELECT last_try, status FROM emby_hot_attempts WHERE av_number=?", (number,)).fetchone()
+        if row and row[1] == "not_found" and days_not_found is not None:
+            days = days_not_found
         if not row or not row[0]:
             return False
         try:
@@ -117,8 +120,10 @@ def rank_sehua_candidates(results: List[Dict], number: str, normalize: Callable[
         first = title.split(" ")[0] if title else ""
         if normalize(first) != number and normalize(title) != number:
             continue
-        sub = r.get("fid") == SEHUA_PREFERRED_FID or "中文字幕" in title or "中字" in title
-        hits.append((0 if sub else 1, r))
+        fid = r.get("fid")
+        board = 0 if fid in (103, 151) else 1 if fid == 37 else 2
+        sub = fid == SEHUA_PREFERRED_FID or "中文字幕" in title or "中字" in title
+        hits.append(((board, 0 if sub else 1), r))
     hits.sort(key=lambda x: x[0])
     return [r for _, r in hits]
 
@@ -142,6 +147,7 @@ class HotDownloader:
         self.sleep = sleep
         self.order = [s for s in (self.cfg.get("download_source_order") or ["sehuatang", "missav"]) if s in finders]
         self.retry_days = int(self.cfg.get("retry_days", 7))
+        self.retry_days_not_found = int(self.cfg.get("retry_days_not_found", 3))
         self.max_per_run = int(self.cfg.get("max_downloads_per_run", 10))
 
     async def run(self, missing: List[str]) -> List[Dict]:
@@ -150,7 +156,7 @@ class HotDownloader:
             if done >= self.max_per_run:
                 report.append({"number": number, "status": "skipped_limit"})
                 continue
-            if self.store.recently_tried(number, self.retry_days):
+            if self.store.recently_tried(number, self.retry_days, days_not_found=self.retry_days_not_found):
                 report.append({"number": number, "status": "skipped_recent"})
                 continue
             done += 1
@@ -229,7 +235,7 @@ def _make_runtime(cfg, log):  # pragma: no cover - 需要真实环境
         b = await _sehua_browser()
         html = await _goto(b, sh._build_full_url(f"search.php?mod=forum&searchsubmit=yes&srchtxt={number}"), True)
         cands = rank_sehua_candidates(parse_sehua_search(html), number, normalize_number)
-        for c in cands[:3]:
+        for c in cands[:5]:
             await asyncio.sleep(random.uniform(2, 4))
             url = sh._build_full_url(f"forum.php?mod=viewthread&tid={c['tid']}")
             section = SEHUA_FID_NAMES.get(c["fid"], "高清中文字幕")

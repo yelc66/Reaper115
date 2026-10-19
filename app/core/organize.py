@@ -19,13 +19,18 @@ VIDEO_EXTS = {"mp4", "mkv", "avi", "wmv", "mov", "ts", "m2ts", "flv", "rmvb", "w
 
 AD_PREFIX_RE = re.compile(r'^(?:\d{6}\.com@|[a-z0-9.-]+\.(?:com|net|org|xyz|cc)@)', re.IGNORECASE)
 
+# 素人系列品番（片商数字前缀如 300MIUM/259LUXU/200GANA 会被去掉，靠品番本身归入素人）
+AMATEUR_LABELS = ["SIRO", "ARA", "KNB", "DCV", "MAAN", "SCUTE", "MIUM", "LUXU", "GANA", "NTK", "KIRAY",
+                  "ORECO", "SIMM", "JAC", "ERK", "MFC", "OREC", "STCV", "HHL", "CUTE", "NAMA", "SWEET",
+                  "MGMQ", "INSTV", "HMDNC", "EWDX", "PAK", "NAEN", "BSKC", "SGK", "MIUMN", "LUXUW"]
+
 # 分类名与 MDC-NG naming.category_mapping 保持一致:
 # jp_censored=日本有码 jp_uncensored=日本无码 jp_amateur=素人 jp_fc2=FC2 cn=国产 ea=欧美 unknown=未知
 DEFAULT_CATEGORIES = [
     {"name": "FC2", "pattern": r"^FC2-PPV-"},
     {"name": "欧美", "pattern": r"^[A-Za-z][A-Za-z0-9]*\.\d{2}\.\d{2}\.\d{2}"},
     {"name": "日本无码", "pattern": r"^(?:HEYZO-|\d{6}[-_]\d{2,3}(?:-[A-Z0-9]+)?$|[NK]\d{4}$|[HC]\d{4}-|CARIB|1PON|10MU|PACOPACOMAMA)"},
-    {"name": "素人", "pattern": r"^(?:\d{3}[A-Z]{2,6}-\d{3,5}$|SIRO-|ARA-|KNB-|DCV-|MAAN-|SCUTE-)"},
+    {"name": "素人", "pattern": r"^(?:\d{3,4}[A-Z]{2,6}-\d{3,5}$|(?:" + "|".join(AMATEUR_LABELS) + r")-\d{3,5}$)"},
     {"name": "日本有码", "pattern": r"^[A-Z]{2,6}-\d{2,5}$"},
 ]
 DEFAULT_CATEGORY = "未知"
@@ -38,7 +43,7 @@ _NUMBER_PATTERNS = [
     ("h4", re.compile(r'(?<![A-Za-z0-9])([HC]\d{4})[-_]([A-Za-z]{2,10}\d{3,6})', re.I)),
     ("tokyohot", re.compile(r'(?:tokyo[-_ ]?hot[-_ ]?)([nk]\d{4})(?!\d)', re.I)),
     ("date", re.compile(r'(?<![\d])(\d{6})[-_](\d{2,3})(?![\d])')),
-    ("amateur", re.compile(r'(?<![A-Za-z0-9])(\d{3})([A-Za-z]{2,6})[-_ ]?(\d{3,5})(?![\d])')),
+    ("amateur", re.compile(r'(?<![A-Za-z0-9])(\d{3,4})([A-Za-z]{2,6})[-_ ]?(\d{3,5})(?![\d])')),
     ("std", re.compile(r'(?<![A-Za-z])([A-Za-z]{2,6})[-_ ]?(\d{2,5})(?![\d])')),
 ]
 # 版本后可跟分段: -C1/-UC2 (版本+分段)、-CD1/-PT1/-PART1、纯数字 -1/_2
@@ -115,7 +120,8 @@ def parse_video_name(filename: str, context: str = "") -> Optional[ParsedName]:
             st = detect_studio(stem, context)
             number = f"{m.group(1)}{st[1]}{m.group(2)}-{st[0]}" if st else f"{m.group(1)}-{m.group(2)}"
         elif kind == "amateur":
-            number = f"{m.group(1)}{m.group(2).upper()}-{m.group(3)}"
+            # 片商数字前缀（200GANA/324SRTD）去掉，只保留标准番号
+            number = f"{m.group(2).upper()}-{m.group(3)}"
         else:
             number = f"{m.group(1).upper()}-{m.group(2)}"
         rest = stem[m.end():]
