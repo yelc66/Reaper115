@@ -41,7 +41,11 @@ async def emby_hot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from app.utils.message_queue import add_task_to_queue
         from telegram.helpers import escape_markdown
         msg = "❌ Emby 热门合集同步失败，详见日志" if res is None else "\n".join(
-            f"✅ {r['collection']}: 库中 {r['owned']}，+{r['added']} -{r['removed']}，缺 {len(r['missing'])}" for r in res) or "榜单为空"
+            f"✅ {r['collection']}: 库中 {r['owned']}，+{r['added']} -{r['removed']}，缺 {len(r['missing'])}" for r in res if 'collection' in r) or "榜单为空"
+        dl = next((r['auto_download'] for r in (res or []) if 'auto_download' in r), None)
+        if dl is not None:
+            sub = [d for d in dl if d.get('status') == 'submitted']
+            msg += f"\n🔽 自动补全: 提交 {len(sub)}，未找到 {sum(d.get('status') == 'not_found' for d in dl)}"
         add_task_to_queue(init.get_allowed_user(), None, escape_markdown(msg, version=2))
     threading.Thread(target=_job, daemon=True).start()
 

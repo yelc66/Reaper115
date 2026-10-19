@@ -10,7 +10,9 @@ emby:
   api_key: xxx
   user_id: ""            # 可选；填写后用 /Users/{id}/Items 查询
   sync_time: "05:00"
-  max_items: 12          # 每个榜单取前 N 个
+  max_items: 48          # 每个榜单取前 N 个（自动翻页）
+  auto_download: false   # 缺失番号自动下载
+  download_source_order: [sehuatang, missav]
   collections:
     today-hot: 今日热门
     weekly-hot: 本周热门
@@ -20,6 +22,7 @@ emby:
 """
 import asyncio
 import os
+import random
 import re
 from typing import Dict, List, Optional
 
@@ -129,10 +132,32 @@ def sync_collection(client: EmbyClient, name: str, ranked_numbers: List[str], lo
     return res
 
 
+def page_url(base: str, path: str, page: int) -> str:
+    url = f"{base.rstrip('/')}/{path.lstrip('/')}"
+    if page <= 1:
+        return url
+    return f"{url}{'&' if '?' in url else '?'}page={page}"
+
+
+async def collect_ranked(fetch_page, max_items: int, max_pages: int = 10) -> List[str]:
+    """按页抓取榜单直到凑满 max_items：fetch_page(page) -> html。某页没有新番号即停止。"""
+    out: List[str] = []
+    for page in range(1, max_pages + 1):
+        html = await fetch_page(page) or ""
+        new = [n for n in numbers_from_list_html(html, 1000) if n not in out]
+        if not new:
+            break
+        out.extend(new)
+        if len(out) >= max_items:
+            break
+    return out[:max_items]
+
+
 async def _fetch_rankings(keys, cfg, base_url, log):
     from app.core.selenium_browser import SeleniumBrowser
     paths = {**DEFAULT_LIST_PATHS, **(cfg.get("list_paths") or {})}
-    max_items = int(cfg.get("max_items", 12))
+    max_items = int(cfg.get("max_items", 48))
+    max_pages = int(cfg.get("max_pages", 10))
     browser = SeleniumBrowser(base_url)
     out = {}
     try:
@@ -142,10 +167,14 @@ async def _fetch_rankings(keys, cfg, base_url, log):
         await browser.pass_cloudflare_check()
         base = base_url if base_url.startswith("http") else f"https://{base_url}"
         for k in keys:
-            await browser.goto(f"{base.rstrip('/')}/{paths[k].lstrip('/')}")
-            await browser.pass_cloudflare_check()
-            out[k] = numbers_from_list_html(await browser.get_page_source() or "", max_items)
-            log.info(f"[Emby热门] 榜单 {k}: {out[k]}")
+            async def fetch(page, _k=k):
+                if page > 1:
+                    await asyncio.sleep(random.uniform(2, 4))
+                await browser.goto(page_url(base, paths[_k], page))
+                await browser.pass_cloudflare_check()
+                return await browser.get_page_source()
+            out[k] = await collect_ranked(fetch, max_items, max_pages)
+            log.info(f"[Emby热门] 榜单 {k}: {len(out[k])} 个 {out[k]}")
             await asyncio.sleep(3)
     finally:
         await browser.close()
@@ -153,7 +182,8 @@ async def _fetch_rankings(keys, cfg, base_url, log):
 
 
 def run_emby_hot(force: bool = False):
-    """调度/手动入口。force=True 时忽略 enabled（手动触发仍需配置 url/api_key）。"""
+    """调度/手动入口。force=True 时忽略 enabled（手动触发仍需配置 url/api_key）。
+    返回每个合集的统计；开启 auto_download 时附加 {"auto_download": [...]}。"""
     import init
     cfg = init.bot_config.get("emby") or {}
     if not (cfg.get("enabled") or force):
@@ -166,7 +196,20 @@ def run_emby_hot(force: bool = False):
     try:
         ranks = asyncio.run(_fetch_rankings(list(cols), cfg, base_url, init.logger))
         client = EmbyClient(cfg["url"], cfg["api_key"], cfg.get("user_id", ""))
-        return [sync_collection(client, cols[k], ranks.get(k, []), init.logger) for k in cols if ranks.get(k)]
+        results = [dict(sync_collection(client, cols[k], ranks.get(k, []), init.logger), ranked=len(ranks.get(k, [])))
+                   for k in cols if ranks.get(k)]
     except Exception as e:
         init.logger.error(f"[Emby热门] 同步失败: {e}")
         return None
+    if cfg.get("auto_download"):
+        missing = []
+        for r in results:
+            missing.extend(n for n in r["missing"] if n not in missing)
+        try:
+            from app.core.emby_hot_download import download_missing
+            dl = download_missing(missing, cfg)
+        except Exception as e:
+            init.logger.error(f"[Emby热门下载] 失败: {e}")
+            dl = [{"status": "error", "msg": str(e)}]
+        results.append({"auto_download": dl})
+    return results
