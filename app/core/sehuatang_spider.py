@@ -879,9 +879,7 @@ async def age_check():
         if any(ind in content for ind in age_indicators):
             init.logger.info("  检测到年龄验证页面，尝试通过多种方式进入...")
             if getattr(browser, "use_flaresolverr_fetch", False):
-                # 直取模式没有 DOM 可点击：带上年龄 cookie 重新请求当前页
-                for name in ("_safe_age", "agecheck", "age_verified"):
-                    await browser.add_cookie({"name": name, "value": "1", "path": "/"})
+                # 直取模式没有 DOM 可点击：带上已有 cookie（含 _safe）重新请求当前页
                 await browser.refresh()
                 new_content = await browser.get_page_source()
                 if any(ind in new_content for ind in age_indicators):
@@ -939,7 +937,7 @@ async def safeid_check():
             init.logger.info("检测到 safeid 变量，尝试提取并添加 Cookie...")
             safeid = extract_safeid(content)
             if safeid:
-                init.logger.info(f"提取到 safeid: {safeid}")
+                init.logger.info(f"提取到 safeid: {safeid[:4]}***")
                 
                 # 添加 cookie
                 cookie_dict = {

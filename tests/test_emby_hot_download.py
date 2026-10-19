@@ -124,3 +124,27 @@ def test_sehua_topic_skip_reason():
     assert hd.sehua_topic_skip_reason("<div>本帖隐藏的内容</div>")
     assert hd.sehua_topic_skip_reason("") == "页面为空"
     assert hd.sehua_topic_skip_reason('<div class="blockcode">magnet:?xt=urn:btih:abc</div>隐藏') is None
+
+
+def test_normalize_strips_studio_prefix():
+    assert eh.normalize_number("200GANA-3446 素人") == "GANA-3446"
+    assert eh.normalize_number("324SRTD-0366") == "SRTD-0366"
+    assert eh.normalize_number("FC2-PPV-4985498") == "FC2-PPV-4985498"
+    assert eh.normalize_number("052425-001-CARIB") == "052425-001-CARIB"
+
+
+def test_rank_board_priority_top5():
+    res = [{"tid": "1", "title": "GANA-3446", "fid": 2}, {"tid": "2", "title": "GANA-3446", "fid": 37},
+           {"tid": "3", "title": "200GANA-3446", "fid": 151}, {"tid": "4", "title": "GANA-3446 中字", "fid": 103}]
+    r = hd.rank_sehua_candidates(res, "GANA-3446", eh.normalize_number)
+    assert [x["tid"] for x in r] == ["4", "3", "2", "1"]
+
+
+def test_not_found_retry_days(tmp_path):
+    st = hd.AttemptStore(str(tmp_path / "a.db"))
+    t0 = datetime.datetime(2026, 10, 1)
+    st.record("A-1", "sehuatang,missav", "not_found", now=t0)
+    st.record("B-1", "missav", "submit_failed", now=t0)
+    later = t0 + datetime.timedelta(days=4)
+    assert not st.recently_tried("A-1", 7, now=later, days_not_found=3)
+    assert st.recently_tried("B-1", 7, now=later, days_not_found=3)

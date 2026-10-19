@@ -85,6 +85,7 @@ emby:
   auto_download: false
   download_source_order: [sehuatang, missav]
   retry_days: 7            # 同一番号 N 天内只尝试一次（emby_hot_attempts 表）
+  retry_days_not_found: 3  # 上次各来源都没找到 magnet 时，N 天后重试（新片常常晚几天才出种）
   max_downloads_per_run: 10
   download_save_path: ""   # 可选：统一离线目录；留空则按来源版块/榜单 save_path
   missav_list_name: Emby热门补全   # missav 来源写入 missav_data 的 list_name

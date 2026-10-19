@@ -452,7 +452,7 @@ class OpenAPI_115:
             init.logger.warn(f"离线下载任务添加失败: {response['message']}")
             raise Exception(response['message'])
 
-    # @handle_token_expiry
+    @handle_token_expiry
     def get_offline_tasks_by_page(self, page=1):
         url = f"{self.base_url}/open/offline/get_task_list"
         params = {"page": page}
@@ -475,6 +475,9 @@ class OpenAPI_115:
             page_count = response['data'].get('page_count', 1)
             for i in range(1, page_count + 1):
                 tasks = self.get_offline_tasks_by_page(i)
+                if tasks is None or (isinstance(tasks, dict) and tasks.get('code') == 40140125):
+                    init.logger.warn(f"获取离线任务第 {i} 页失败，停止翻页")
+                    break
                 if tasks and 'tasks' in tasks:
                     for task in tasks['tasks']:
                         task_list.append({
