@@ -78,7 +78,16 @@ emby:
   api_key: ""              # Emby 控制台 → 高级 → API 密钥
   user_id: ""              # 可选
   sync_time: "05:00"
-  max_items: 12            # 每个榜单取前 N 个番号
+  max_items: 48            # 每个榜单取前 N 个番号（自动翻页 ?page=N）
+  max_pages: 10            # 翻页上限
+  # 缺失番号自动下载：上榜但 Emby 库中没有的番号，先搜涩花（中文字幕帖优先），再用 missav 详情页 magnet，
+  # 提交 115 离线后走正常后处理（广告清理 → 重命名 → organize 整理）
+  auto_download: false
+  download_source_order: [sehuatang, missav]
+  retry_days: 7            # 同一番号 N 天内只尝试一次（emby_hot_attempts 表）
+  max_downloads_per_run: 10
+  download_save_path: ""   # 可选：统一离线目录；留空则按来源版块/榜单 save_path
+  missav_list_name: Emby热门补全   # missav 来源写入 missav_data 的 list_name
   collections:             # 榜单 → 合集名（删掉某行即不同步该榜单）
     today-hot: 今日热门
     weekly-hot: 本周热门

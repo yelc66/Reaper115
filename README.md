@@ -49,7 +49,9 @@ Reaper115 是一个基于 Python 的 Telegram Bot 项目，聚焦涩花资源自
 
 - 配置项：`url`、`api_key`、`user_id`（可选）、`sync_time`、`max_items`、`collections`（榜单→合集名）、`list_paths`（可选）
 - 番号匹配复用 `organize` 的解析规则（文件名/路径/名称）；同一番号多版本都会加入合集
-- 测试：`pytest tests/test_emby_hot.py`
+- 榜单自动翻页（`?page=N`），直到凑满 `max_items`（默认 48）或 `max_pages`
+- `auto_download: true` 时，上榜但库中没有的番号会自动补全：按 `download_source_order`（默认 `[sehuatang, missav]`）先在涩花站内搜索番号（「高清中文字幕」版块/中文字幕帖优先），找不到再取 missav 详情页 magnet；提交 115 离线后写入 `sehua_data`/`missav_data`，走正常后处理（广告清理 → 重命名 → `organize` 整理）。每个番号 `retry_days` 天内只尝试一次，单次最多 `max_downloads_per_run` 个，每个提交都会 TG 通知
+- 测试：`pytest tests/test_emby_hot.py tests/test_emby_hot_download.py`
 
 ## 快速开始
 

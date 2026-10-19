@@ -1,6 +1,3 @@
-- 新增：离线下载完成后可选按番号整理（organize，默认关闭，支持 dry_run）
-  - 分类与 MDC-NG 对齐：日本有码 / 日本无码 / 素人 / FC2 / 国产 / 欧美 / 未知
-  - 目标结构：/涩花/整理/{分类}/{番号}/{番号} - {版本}[-cdN].ext
-  - 识别 -C / -UC / -U 版本、多分段（-C1、-CD1、-PT1、_1、A/B/C/D）、无码日期番号片商（CARIB/1PON/10MU/PACO/CARIBPR）、清晰度标记
-  - 真重复保留为 " - C2" / " - 2"
-- 新增：Emby 热门合集（emby，默认关闭）：missav 今日/本周/本月热门榜单中库内已有的影片同步为 Emby 合集，每日定时 + TG /embyhot 手动触发
+- 新增：Emby 热门榜单自动翻页（max_items 默认 48）
+- 新增：热门缺失番号自动下载（emby.auto_download，默认关闭）：涩花搜索优先（中文字幕帖优先），missav 详情页兜底；提交 115 离线后走正常后处理与 organize 整理；emby_hot_attempts 表按 retry_days 去重；每个提交 TG 通知
+- 改进：missav 后处理完成后同样执行 organize 按番号整理

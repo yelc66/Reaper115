@@ -181,7 +181,9 @@ def missav_post_process():
                 final_path = f"{save_path}/{resource_name}"
                 if init.openapi_115.is_directory(final_path):
                     init.openapi_115.auto_clean_all(final_path, protect_sibling_of_largest=True)
-                    _rename_by_title(final_path, title)
+                    final_path = _rename_by_title(final_path, title) or final_path
+                    from app.core.offline_task_retry import _organize_by_number
+                    _organize_by_number(final_path)
                 else:
                     init.logger.info(f"[missav后处理] {title} 为单文件，跳过广告清理和重命名")
             except Exception as e:
@@ -227,19 +229,21 @@ def missav_post_process():
 
 def _rename_by_title(final_path, title):
     if not init.bot_config.get('missav_spider', {}).get('rename_by_title', False):
-        return
+        return final_path
     new_name = _sanitize_title(title)
     if not new_name:
         init.logger.warn(f"[missav后处理] 标题为空，跳过重命名: {final_path}")
-        return
+        return final_path
     current_name = os.path.basename(final_path)
     if current_name == new_name:
-        return
+        return final_path
     ok = init.openapi_115.rename(final_path, new_name)
     if ok:
         init.logger.info(f"[missav后处理] 重命名成功: [{current_name}] → [{new_name}]")
+        return f"{os.path.dirname(final_path)}/{new_name}"
     else:
         init.logger.warn(f"[missav后处理] 重命名失败: [{current_name}] → [{new_name}]")
+    return final_path
 
 
 if __name__ == '__main__':
