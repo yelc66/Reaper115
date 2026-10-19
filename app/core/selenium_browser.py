@@ -157,6 +157,7 @@ class _FlaresolverrSession:
         return list(self._cookies.values())
 
     def refresh(self):
+        # 真正的重新取页由 SeleniumBrowser.refresh()/goto() 完成（需带上已添加的 cookie）
         pass
 
     def get(self, url):
@@ -280,6 +281,18 @@ class SeleniumBrowser:
                 time.sleep(2)
             except Exception as e:
                 init.logger.warn(f"Selenium导航失败: {e}")
+
+    async def refresh(self):
+        """重新加载当前页面；直取模式下带上当前 cookie 重新请求 Flaresolverr。"""
+        if self.use_flaresolverr_fetch:
+            url = self.driver.current_url if self.driver else None
+            if url:
+                await self.goto(url)
+            return
+        await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.driver.refresh() if self.driver else None)
+
+    async def add_cookie(self, cookie):
+        await asyncio.get_running_loop().run_in_executor(self.executor, lambda: self.driver.add_cookie(cookie) if self.driver else None)
 
     async def get_page_source(self):
         if self.use_flaresolverr_fetch:

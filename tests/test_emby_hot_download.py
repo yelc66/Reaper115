@@ -109,3 +109,18 @@ def test_downloader_submit_failure_recorded(tmp_path):
     d, st, _, notes = _run(tmp_path, {"download_source_order": ["missav"]}, {"missav": mv}, submit_ok=False)
     assert asyncio.run(d.run(["D-4"]))[0]["status"] == "submit_failed" and not notes
     assert st.recently_tried("D-4", 7)
+
+
+def test_rank_sehua_whitelist_filters_before_topn():
+    res = [{"tid": str(i), "title": "MIDA-117 求片", "fid": 143} for i in range(3)] + \
+          [{"tid": "9", "title": "MIDA-117 AI", "fid": 166},
+           {"tid": "10", "title": "MIDA-117 有码", "fid": 37}]
+    ranked = hd.rank_sehua_candidates(res, "MIDA-117", eh.normalize_number)
+    assert [r["tid"] for r in ranked] == ["10"]
+    assert hd.SEHUA_FID_NAMES[143] == "求片问答" and hd.SEHUA_FID_NAMES[166] == "AI专区"
+
+
+def test_sehua_topic_skip_reason():
+    assert hd.sehua_topic_skip_reason("<div>本帖隐藏的内容</div>")
+    assert hd.sehua_topic_skip_reason("") == "页面为空"
+    assert hd.sehua_topic_skip_reason('<div class="blockcode">magnet:?xt=urn:btih:abc</div>隐藏') is None

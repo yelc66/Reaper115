@@ -18,7 +18,23 @@ from typing import Callable, Dict, List, Optional
 
 SEHUA_PREFERRED_FID = 103  # 高清中文字幕
 SEHUA_FID_NAMES = {2: "国产原创", 36: "亚洲无码原创", 37: "亚洲有码原创", 103: "高清中文字幕",
-                   104: "素人有码系列", 151: "4K原版", 160: "VR视频区", 38: "欧美无码"}
+                   104: "素人有码系列", 151: "4K原版", 160: "VR视频区", 38: "欧美无码",
+                   143: "求片问答", 166: "AI专区"}
+# 只有这些资源版块的帖子才可能直接带 magnet；求片区(143)/AI专区(166) 等一律排除
+SEHUA_RESOURCE_FIDS = (103, 151, 37, 36, 104, 2, 160, 38)
+_SEHUA_LOCK_MARKERS = ("隐藏", "本帖隐藏", "锁定", "locked", "抱歉，本帖要求阅读权限", "没有权限")
+
+
+def sehua_topic_skip_reason(html: str) -> Optional[str]:
+    """帖子页面被锁/隐藏/无权限时返回原因，否则 None。"""
+    if not html:
+        return "页面为空"
+    if "blockcode" in html or "magnet:?" in html:
+        return None
+    for m in _SEHUA_LOCK_MARKERS:
+        if m in html:
+            return f"帖子含「{m}」"
+    return None
 
 _ATTEMPT_DDL = """CREATE TABLE IF NOT EXISTS emby_hot_attempts (
     av_number TEXT PRIMARY KEY,
@@ -95,6 +111,8 @@ def rank_sehua_candidates(results: List[Dict], number: str, normalize: Callable[
     """只保留标题番号与目标一致的帖子；中文字幕版块/标题优先。"""
     hits = []
     for r in results:
+        if r.get("fid") not in SEHUA_RESOURCE_FIDS:
+            continue
         title = r.get("title", "")
         first = title.split(" ")[0] if title else ""
         if normalize(first) != number and normalize(title) != number:
@@ -215,7 +233,12 @@ def _make_runtime(cfg, log):  # pragma: no cover - 需要真实环境
             await asyncio.sleep(random.uniform(2, 4))
             url = sh._build_full_url(f"forum.php?mod=viewthread&tid={c['tid']}")
             section = SEHUA_FID_NAMES.get(c["fid"], "高清中文字幕")
-            res = await sh.parse_topic(section, await _goto(b, url, True), url,
+            page = await _goto(b, url, True)
+            reason = sehua_topic_skip_reason(page)
+            if reason:
+                log.info(f"[emby_hot] {number} 跳过 sehuatang tid={c['tid']} ({section}): {reason}")
+                continue
+            res = await sh.parse_topic(section, page, url,
                                        datetime.datetime.now().strftime("%Y-%m-%d"))
             if res and res.get("magnet"):
                 res["section_name"] = section

@@ -1,3 +1,4 @@
+import re
 # -*- coding: utf-8 -*-
 
 import json
@@ -78,7 +79,7 @@ async def reload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init.load_yaml_config()
     init.initialize_115open()
     init.logger.info("Reload configuration success:")
-    init.logger.info(json.dumps(init.bot_config))
+    init.logger.info(json.dumps(redact_config(init.bot_config), ensure_ascii=False))
     await context.bot.send_message(chat_id=update.effective_chat.id, text="🔁重载配置完成！", parse_mode="html")
 
 def start_async_loop():
@@ -153,9 +154,28 @@ def check_browser_on_startup():
         return True
 
 
+_SENSITIVE_KEY_RE = re.compile(r"token|api_?key|apikey|secret|passw|pwd|cookie|session|auth|credential|private", re.I)
+
+
+def redact_config(obj):
+    """递归打码配置里的敏感字段（token/api_key/cookie/password 等），用于启动日志。"""
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if _SENSITIVE_KEY_RE.search(str(k)) and v not in (None, "", [], {}):
+                out[k] = "***"
+            else:
+                out[k] = redact_config(v)
+        return out
+    if isinstance(obj, list):
+        return [redact_config(v) for v in obj]
+    return obj
+
+
 def update_logger_level():
     import logging
     logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
     logging.getLogger('telegram').setLevel(logging.WARNING)
     logging.getLogger('telegram.ext.Application').setLevel(logging.WARNING)
     logging.getLogger('telegram.ext.Updater').setLevel(logging.WARNING)
@@ -209,7 +229,7 @@ if __name__ == '__main__':
     else:
         init.logger.warn("Telegram Bot 未配置，跳过 Telegram polling 和消息队列。")
     init.logger.info("Starting bot with configuration:")
-    init.logger.info(json.dumps(init.bot_config))
+    init.logger.info(json.dumps(redact_config(init.bot_config), ensure_ascii=False))
     if not check_browser_on_startup():
         init.logger.error("浏览器检测失败，程序将退出。")
         exit(1)

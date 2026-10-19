@@ -12,6 +12,9 @@ class Logger:
         """
         self.logger = logging.getLogger()
         self.logger.setLevel(level)
+        # httpx/httpcore 的 INFO 日志会带出 api.telegram.org/bot<token>/... 明文 token
+        for _name in ("httpx", "httpcore"):
+            logging.getLogger(_name).setLevel(logging.WARNING)
         fmt = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', '%Y-%m-%d %H:%M:%S')
 
         # 设置控制台输出
